@@ -45,7 +45,7 @@ export function Stat({ label, value, hint, tone, href }: {
       {hint && <div className="mt-0.5 truncate text-xs text-zinc-500">{hint}</div>}
     </>
   );
-  const cls = "block min-w-0 rounded-xl border border-black/[.07] bg-white px-3 py-2.5 dark:border-white/10 dark:bg-zinc-900";
+  const cls = "block min-w-0 rounded-xl border border-black/[.07] bg-white px-3 py-2 sm:py-2.5 dark:border-white/10 dark:bg-zinc-900";
   return href ? <Link href={href} className={`${cls} hover:border-indigo-300 dark:hover:border-indigo-500/50`}>{body}</Link> : <div className={cls}>{body}</div>;
 }
 

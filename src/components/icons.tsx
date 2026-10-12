@@ -38,22 +38,18 @@ export function Icon({ name, className = "size-4" }: { name: string; className?:
 }
 
 // Логотип: коробка-посилка на градієнті. Те саме, що app/icon.svg.
+// Градієнт у CSS, а не в <defs>: SVG-id з прихованого сайдбару ламає мобільну копію.
 export function LogoMark({ className = "size-8" }: { className?: string }) {
   return (
-    <svg viewBox="0 0 64 64" className={className} aria-hidden="true">
-      <defs>
-        <linearGradient id="tovarka-g" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#6366f1" />
-          <stop offset="1" stopColor="#0ea5e9" />
-        </linearGradient>
-      </defs>
-      <rect width="64" height="64" rx="15" fill="url(#tovarka-g)" />
-      <g fill="none" stroke="#fff" strokeWidth="4" strokeLinejoin="round" strokeLinecap="round">
-        <path d="M32 13 50 22v20L32 51 14 42V22Z" />
-        <path d="M14 22l18 9 18-9M32 31v20" />
-        <path d="M23 17.5l18 9" />
-      </g>
-    </svg>
+    <span className={`inline-block shrink-0 rounded-[23%] bg-linear-to-br from-[#6366f1] to-[#0ea5e9] ${className}`} aria-hidden="true">
+      <svg viewBox="0 0 64 64" className="size-full">
+        <g fill="none" stroke="#fff" strokeWidth="4" strokeLinejoin="round" strokeLinecap="round">
+          <path d="M32 13 50 22v20L32 51 14 42V22Z" />
+          <path d="M14 22l18 9 18-9M32 31v20" />
+          <path d="M23 17.5l18 9" />
+        </g>
+      </svg>
+    </span>
   );
 }
 
