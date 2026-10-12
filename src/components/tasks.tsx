@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { ConfirmButton } from "./confirm";
-import { deleteTask, setTaskStatus, updateTask } from "@/app/(panel)/actions";
+import { askTaskHelp, deleteTask, setTaskStatus, updateTask } from "@/app/(panel)/actions";
+import { Markdown } from "./markdown";
+import { termify } from "./terms";
 import { Icon } from "./icons";
 import { Badge, Button, Field, inputCls } from "./ui";
 import { PRIORITIES, date, daysUntil, money } from "@/lib/format";
@@ -8,7 +10,7 @@ import { PRIORITIES, date, daysUntil, money } from "@/lib/format";
 export type TaskRow = {
   id: string; title: string; details: string | null; status: string; priority: number;
   due_on: string | null; cost_uah: number | string | null; source: string; step_id: string | null;
-  product_id: string | null; minutes?: number | null; products?: { name: string } | null; playbook_steps?: { n: number; title: string } | null;
+  product_id: string | null; minutes?: number | null; help?: string | null; stuck_note?: string | null; stuck_at?: string | null; products?: { name: string } | null; playbook_steps?: { n: number; title: string } | null;
 };
 
 function StatusButton({ id, status, icon, title, active }: { id: string; status: string; icon: string; title: string; active?: boolean }) {
@@ -50,6 +52,7 @@ export function TaskItem({ t, showContext }: { t: TaskRow; showContext?: boolean
             {t.status === "doing" && <Badge tone="blue">в роботі</Badge>}
             {t.priority === 1 && !done && <Badge tone="amber">важливо</Badge>}
             {t.source === "analyst" && <Badge tone="blue">аналітик</Badge>}
+            {t.stuck_at && !done && <Badge tone="amber">питання аналітику</Badge>}
             {t.due_on && !done && (
               <Badge tone={left !== null && left < 0 ? "red" : left !== null && left <= 2 ? "amber" : "gray"}>
                 до {date(t.due_on)}
@@ -64,7 +67,30 @@ export function TaskItem({ t, showContext }: { t: TaskRow; showContext?: boolean
           </span>
         </summary>
         <div className="mt-2 space-y-2 rounded-lg bg-zinc-50 p-2.5 dark:bg-white/5">
-          {t.details && <p className="whitespace-pre-line text-sm text-zinc-600 dark:text-zinc-400">{t.details}</p>}
+          {t.details && <p className="whitespace-pre-line text-sm text-zinc-600 dark:text-zinc-400">{termify(t.details)}</p>}
+          {t.help && (
+            <div className="rounded-lg border border-indigo-200 bg-white p-2.5 dark:border-indigo-500/30 dark:bg-zinc-900">
+              <div className="mb-1 text-xs font-semibold text-indigo-700 dark:text-indigo-300">Як саме</div>
+              <Markdown text={t.help} />
+            </div>
+          )}
+          {!done && (
+            t.stuck_at ? (
+              <p className="text-xs text-amber-700 dark:text-amber-400">Твоє питання: «{t.stuck_note}». Аналітик відповість тут під час ранкового запуску.</p>
+            ) : (
+              <details className="group/stuck">
+                <summary className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-amber-300 px-2.5 py-1 text-xs font-medium text-amber-700 dark:border-amber-500/40 dark:text-amber-400">
+                  <Icon name="alert" className="size-3.5" /> Застряг
+                </summary>
+                <form action={askTaskHelp} className="mt-2 flex flex-col gap-2 sm:flex-row">
+                  <input type="hidden" name="id" value={t.id} />
+                  <input name="stuck_note" placeholder="Що саме незрозуміло або не виходить?" className={inputCls} />
+                  <Button variant="ghost">Спитати аналітика</Button>
+                </form>
+                <p className="mt-1 text-[11px] text-zinc-500">Спершу глянь «Як саме» вище. Відповідь з’явиться під задачею наступного ранку.</p>
+              </details>
+            )
+          )}
           <form action={updateTask} className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <input type="hidden" name="id" value={t.id} />
             <div className="col-span-2"><Field label="Задача" name="title" defaultValue={t.title} required /></div>

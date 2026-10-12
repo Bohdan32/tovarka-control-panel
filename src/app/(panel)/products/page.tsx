@@ -4,7 +4,7 @@ import { requireMember } from "@/lib/auth";
 import { createProduct, rejectIdea, startTest } from "../actions";
 import { AddForm, Badge, Button, Field, FormGrid, PageHeader, Pills, Progress, Stat, Stats, TextArea } from "@/components/ui";
 import { ConfirmButton } from "@/components/confirm";
-import { STAGES, date, daysUntil, landedEstimate, money, pct, roughMargin } from "@/lib/format";
+import { NOT_FOR_US, STAGES, date, daysUntil, fitIssues, landedEstimate, money, pct, roughMargin } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Банк товарів" };
 
@@ -40,12 +40,14 @@ export default async function ProductsPage({ searchParams }: PageProps<"/product
   ]);
   const rate = Number(settings?.usd_rate ?? 0);
   const all = (data ?? []) as P[];
-  const live = all.filter((p) => p.stage !== "rejected");
+  const blocked = (p: P) => fitIssues(p).block.length > 0 && ["idea", "demand"].includes(p.stage);
+  const live = all.filter((p) => p.stage !== "rejected" && !blocked(p));
   const seasonal = live.filter((p) => p.stock_by);
   const filters: Record<string, (p: P) => boolean> = {
-    "": (p) => p.stage !== "rejected",
-    season: (p) => p.stage !== "rejected" && !!p.stock_by,
-    year: (p) => p.stage !== "rejected" && !p.stock_by,
+    "": (p) => p.stage !== "rejected" && !blocked(p),
+    season: (p) => p.stage !== "rejected" && !blocked(p) && !!p.stock_by,
+    year: (p) => p.stage !== "rejected" && !blocked(p) && !p.stock_by,
+    unfit: (p) => p.stage !== "rejected" && blocked(p),
     test: (p) => !["idea", "rejected", "paused"].includes(p.stage),
     rejected: (p) => p.stage === "rejected",
   };
@@ -75,15 +77,32 @@ export default async function ProductsPage({ searchParams }: PageProps<"/product
           ["/products?f=season", "Сезон", all.filter(filters.season).length],
           ["/products?f=year", "Цілий рік", all.filter(filters.year).length],
           ["/products?f=test", "У роботі", all.filter(filters.test).length],
+          ["/products?f=unfit", "Не підходять", all.filter(filters.unfit).length],
           ["/products?f=rejected", "Відкинуті", all.filter(filters.rejected).length],
         ]}
       />
+
+      {key === "unfit" ? (
+        <p className="text-[13px] text-zinc-500">Ці товари автофільтр сховав з банку: червоні позначки пояснюють чому. Якщо вважаєш, що фільтр помилився, все одно можеш узяти товар у тест.</p>
+      ) : (
+        <details className="rounded-xl border border-black/[.07] bg-white px-3 py-2 text-sm dark:border-white/10 dark:bg-zinc-900">
+          <summary className="cursor-pointer text-[13px] text-zinc-600 dark:text-zinc-400">
+            Що ми не возимо і чому · сховано {all.filter(filters.unfit).length} товарів
+          </summary>
+          <ul className="mt-2 space-y-1.5">
+            {NOT_FOR_US.map(([rule, why]) => (
+              <li key={rule}><b className="font-medium">{rule}.</b> <span className="text-zinc-600 dark:text-zinc-400">{why}</span></li>
+            ))}
+          </ul>
+        </details>
+      )}
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {rows.map((p) => {
           const landed = landedEstimate(p, rate);
           const m = roughMargin(p.price_median_uah, landed);
           const src = srcFor(p.id);
+          const fit = fitIssues(p);
           return (
             <article key={p.id} className="flex flex-col rounded-xl border border-black/[.07] bg-white p-3 dark:border-white/10 dark:bg-zinc-900">
               <div className="flex items-start justify-between gap-2">
@@ -101,6 +120,8 @@ export default async function ProductsPage({ searchParams }: PageProps<"/product
                 {p.stage !== "idea" && <Badge tone={p.stage === "rejected" ? "red" : "blue"}>{STAGES[p.stage]}</Badge>}
                 <Deadline stockBy={p.stock_by} />
                 {p.confidence !== null && <Badge tone={p.confidence >= 60 ? "green" : p.confidence >= 40 ? "amber" : "red"}>впевненість {p.confidence}%</Badge>}
+                {fit.block.map((x) => <Badge key={x} tone="red">{x}</Badge>)}
+                {fit.warn.map((x) => <Badge key={x} tone="amber">{x}</Badge>)}
               </div>
 
               <dl className="mt-3 grid grid-cols-3 gap-2 text-sm">

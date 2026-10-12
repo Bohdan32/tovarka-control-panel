@@ -4,7 +4,8 @@ import { Badge, Card, Progress } from "@/components/ui";
 import { Markdown } from "@/components/markdown";
 import { TaskList, sortTasks, type TaskRow } from "@/components/tasks";
 import { Icon } from "@/components/icons";
-import { compact, date, daysUntil, landedEstimate, money, pct, roughMargin } from "@/lib/format";
+import { buildCalendar } from "@/lib/calendar";
+import { compact, date, daysUntil, fitIssues, landedEstimate, money, pct, roughMargin } from "@/lib/format";
 
 const RAIL_DAYS = 55;
 const open = (t: TaskRow) => t.status === "todo" || t.status === "doing";
@@ -12,12 +13,13 @@ const hours = (min: number) => (min < 60 ? `${min} хв` : `${Math.round(min / 6
 
 export default async function Navigator() {
   const { supabase, member } = await requireMember();
-  const [{ data: steps }, { data: taskRows }, { data: products }, { data: reports }, { data: settings }] = await Promise.all([
+  const [{ data: steps }, { data: taskRows }, { data: products }, { data: reports }, { data: settings }, { data: events }] = await Promise.all([
     supabase.from("playbook_steps").select("*").order("n"),
-    supabase.from("tasks").select("*, products(name), playbook_steps(n, title)"),
+    supabase.from("tasks").select("*, products(name), playbook_steps(n, title)").neq("source", "claude"),
     supabase.from("products").select("*").neq("stage", "rejected").order("score", { ascending: false, nullsFirst: false }),
     supabase.from("analyst_reports").select("*").eq("role", "lead").order("created_at", { ascending: false }).limit(1),
     supabase.from("cost_settings").select("usd_rate, usd_rate_date").eq("id", 1).single(),
+    supabase.from("calendar_events").select("kind, title, note, starts_on, ends_on"),
   ]);
   const tasks = (taskRows ?? []) as TaskRow[];
   const all = steps ?? [];
@@ -37,7 +39,7 @@ export default async function Navigator() {
   const inTest = (products ?? []).filter((p) => !["idea", "demand", "paused"].includes(p.stage));
   const testTasks = sortTasks(tasks.filter((t) => t.product_id && open(t) && inTest.some((p) => p.id === t.product_id))).slice(0, 4);
   const hot = (products ?? [])
-    .filter((p) => p.stage === "idea" && p.price_median_uah)
+    .filter((p) => p.stage === "idea" && p.price_median_uah && !fitIssues(p).block.length)
     .map((p) => {
       const by = p.stock_by ? new Date(new Date(p.stock_by).getTime() - RAIL_DAYS * 864e5).toISOString().slice(0, 10) : null;
       return { ...p, orderBy: by, left: daysUntil(by), margin: roughMargin(p.price_median_uah, landedEstimate(p, rate)) };
@@ -46,6 +48,7 @@ export default async function Navigator() {
     .sort((a, b) => (a.left ?? 999) - (b.left ?? 999) || (b.score ?? 0) - (a.score ?? 0))
     .slice(0, 4);
   const lead = reports?.[0];
+  const soon = buildCalendar(events ?? [], [], products ?? []).items.filter((i) => (daysUntil(i.date) ?? 99) >= 0 && (daysUntil(i.date) ?? 99) <= 45).slice(0, 4);
   // Задачі з інших кроків, у яких скоро дедлайн (наприклад, акція з кінцем терміну).
   const urgent = sortTasks(tasks.filter((t) => open(t) && t.step_id !== current?.id && !t.product_id && (daysUntil(t.due_on) ?? 99) <= 21)).slice(0, 3);
 
@@ -147,11 +150,25 @@ export default async function Navigator() {
             )}
           </Card>
 
+          {soon.length > 0 && (
+            <Card title="Найближче в календарі" action={<Link href="/calendar" className="text-xs text-indigo-600 hover:underline dark:text-indigo-400">Календар →</Link>}>
+              <ul className="space-y-1.5 text-sm">
+                {soon.map((i) => (
+                  <li key={i.date + i.title} className="flex gap-2">
+                    <span className="w-16 shrink-0 text-xs tabular-nums text-zinc-500">{date(i.date).slice(0, 5)} · {daysUntil(i.date)} дн.</span>
+                    <span className="min-w-0">{i.title}</span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+
           <Card title="Корисне">
             <div className="grid gap-2 text-sm">
               <Link href="/sell" className="flex items-center gap-2 rounded-lg p-2 hover:bg-zinc-50 dark:hover:bg-white/5"><Icon name="megaphone" className="size-4 text-indigo-500" /> Як продавати: канали, відгуки, реклама</Link>
               <Link href="/sell?s=simulator" className="flex items-center gap-2 rounded-lg p-2 hover:bg-zinc-50 dark:hover:bg-white/5"><Icon name="calc" className="size-4 text-indigo-500" /> Симулятор: скільки заробиш або втратиш</Link>
-              <Link href="/sell?s=texts" className="flex items-center gap-2 rounded-lg p-2 hover:bg-zinc-50 dark:hover:bg-white/5"><Icon name="book" className="size-4 text-indigo-500" /> Готові відповіді покупцям</Link>
+              <Link href="/sell?s=texts" className="flex items-center gap-2 rounded-lg p-2 hover:bg-zinc-50 dark:hover:bg-white/5"><Icon name="book" className="size-4 text-indigo-500" /> Готові тексти покупцям і постачальникам</Link>
+              <Link href="/sell?s=slovnyk" className="flex items-center gap-2 rounded-lg p-2 hover:bg-zinc-50 dark:hover:bg-white/5"><Icon name="bulb" className="size-4 text-indigo-500" /> Словник: ТТН, MOQ, CPA та інші слова</Link>
             </div>
           </Card>
         </div>

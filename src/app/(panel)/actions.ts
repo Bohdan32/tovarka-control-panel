@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireMember } from "@/lib/auth";
 import { numOrNull, pctOrNull, str } from "@/lib/form";
+import { BATCH_CHECKS } from "@/lib/checks";
 
 async function db() {
   const { supabase, member } = await requireMember();
@@ -426,7 +427,14 @@ export async function setIdeaStatus(fd: FormData) {
   const { supabase } = await db();
   const status = str(fd, "status") ?? "new";
   if (!IDEA_STATUSES.includes(status)) throw new Error("Невідомий статус");
-  check((await supabase.from("ideas").update({ status }).eq("id", str(fd, "id")!)).error);
+  const { data, error } = await supabase.from("ideas").update({ status }).eq("id", str(fd, "id")!).select("task_id").single();
+  check(error);
+  // Задача в плані йде слідом за ідеєю.
+  if (data?.task_id) {
+    const taskStatus = status === "done" ? "done" : status === "skip" ? "skipped" : status === "doing" ? "doing" : "todo";
+    check((await supabase.from("tasks").update({ status: taskStatus, done_at: taskStatus === "done" ? new Date().toISOString() : null }).eq("id", data.task_id)).error);
+    revalidateTasks();
+  }
   revalidatePath("/ideas");
 }
 
@@ -439,7 +447,7 @@ export async function ideaToTask(fd: FormData) {
   if (!idea!.task_id) {
     const { data: task, error: e2 } = await supabase
       .from("tasks")
-      .insert({ title: idea!.title, details: idea!.why, priority: idea!.impact === 3 ? 1 : 2, source: "manual" })
+      .insert({ title: idea!.title, details: idea!.why, priority: idea!.impact === 3 ? 1 : 2, source: "claude" })
       .select("id")
       .single();
     check(e2);
@@ -464,4 +472,33 @@ export async function createIdea(fd: FormData) {
   });
   check(error);
   revalidatePath("/ideas");
+}
+
+// ---------- Чекліст перед партією ----------
+
+export async function toggleBatchCheck(fd: FormData) {
+  const { supabase } = await db();
+  const productId = str(fd, "product_id")!;
+  const key = str(fd, "key")!;
+  if (!BATCH_CHECKS.some(([k]) => k === key)) throw new Error("Невідомий пункт");
+  const { data, error } = await supabase.from("products").select("batch_check").eq("id", productId).single();
+  check(error);
+  const current: string[] = data?.batch_check ?? [];
+  const next = current.includes(key) ? current.filter((k) => k !== key) : [...current, key];
+  check((await supabase.from("products").update({ batch_check: next }).eq("id", productId)).error);
+  revalidatePath(`/products/${productId}`);
+}
+
+// ---------- «Застряг» ----------
+// Питання йде аналітику: він відповідає в полі help під задачею під час ранкового запуску.
+export async function askTaskHelp(fd: FormData) {
+  const { supabase } = await db();
+  const { data, error } = await supabase
+    .from("tasks")
+    .update({ stuck_note: str(fd, "stuck_note") ?? "Не розумію, що робити", stuck_at: new Date().toISOString() })
+    .eq("id", str(fd, "id")!)
+    .select("product_id")
+    .single();
+  check(error);
+  revalidateTasks(data?.product_id);
 }

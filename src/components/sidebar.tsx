@@ -13,6 +13,7 @@ export const NAV: { group: string; items: Item[]; note?: string }[] = [
     items: [
       ["/", "Навігатор", "home"],
       ["/plan", "План запуску", "plan"],
+      ["/calendar", "Календар", "calendar"],
       ["/sell", "Як продавати", "megaphone"],
     ],
   },
