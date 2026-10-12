@@ -47,6 +47,12 @@ export async function updateProduct(fd: FormData) {
       planned_cpa_uah: numOrNull(fd, "planned_cpa_uah"),
       source_url: str(fd, "source_url"),
       notes: str(fd, "notes"),
+      thesis: str(fd, "thesis"),
+      risks: str(fd, "risks"),
+      kill_criteria: str(fd, "kill_criteria"),
+      seasonality: str(fd, "seasonality"),
+      confidence: numOrNull(fd, "confidence"),
+      next_review_on: str(fd, "next_review_on"),
     })
     .eq("id", id);
   check(error);
@@ -148,6 +154,7 @@ export async function updateSettings(fd: FormData) {
       cargo_usd_per_kg: numOrNull(fd, "cargo_usd_per_kg") ?? undefined,
       packaging_uah: numOrNull(fd, "packaging_uah") ?? undefined,
       fee_pct: pctOrNull(fd, "fee_pct") ?? undefined,
+      tax_pct: pctOrNull(fd, "tax_pct") ?? undefined,
       target_margin: pctOrNull(fd, "target_margin") ?? undefined,
       refusal_rate: pctOrNull(fd, "refusal_rate") ?? undefined,
       return_shipping_uah: numOrNull(fd, "return_shipping_uah") ?? undefined,
@@ -273,4 +280,91 @@ export async function createTransaction(fd: FormData) {
   });
   check(error);
   revalidatePath("/finance");
+}
+
+// ---------- План і задачі ----------
+function revalidateTasks(productId?: string | null) {
+  revalidatePath("/plan");
+  revalidatePath("/");
+  if (productId) revalidatePath(`/products/${productId}`);
+}
+
+export async function createTask(fd: FormData) {
+  const { supabase } = await db();
+  const productId = str(fd, "product_id");
+  const { error } = await supabase.from("tasks").insert({
+    title: str(fd, "title") ?? "Без назви",
+    details: str(fd, "details"),
+    step_id: str(fd, "step_id"),
+    product_id: productId,
+    priority: numOrNull(fd, "priority") ?? 2,
+    due_on: str(fd, "due_on"),
+    cost_uah: numOrNull(fd, "cost_uah"),
+  });
+  check(error);
+  revalidateTasks(productId);
+}
+
+export async function setTaskStatus(fd: FormData) {
+  const { supabase } = await db();
+  const status = str(fd, "status") ?? "todo";
+  const { data, error } = await supabase
+    .from("tasks")
+    .update({ status, done_at: status === "done" ? new Date().toISOString() : null })
+    .eq("id", str(fd, "id")!)
+    .select("product_id")
+    .single();
+  check(error);
+  revalidateTasks(data?.product_id);
+}
+
+export async function updateTask(fd: FormData) {
+  const { supabase } = await db();
+  const { data, error } = await supabase
+    .from("tasks")
+    .update({
+      title: str(fd, "title") ?? "Без назви",
+      details: str(fd, "details"),
+      priority: numOrNull(fd, "priority") ?? 2,
+      due_on: str(fd, "due_on"),
+      cost_uah: numOrNull(fd, "cost_uah"),
+    })
+    .eq("id", str(fd, "id")!)
+    .select("product_id")
+    .single();
+  check(error);
+  revalidateTasks(data?.product_id);
+}
+
+export async function deleteTask(fd: FormData) {
+  const { supabase } = await db();
+  const { data, error } = await supabase.from("tasks").delete().eq("id", str(fd, "id")!).select("product_id").maybeSingle();
+  check(error);
+  revalidateTasks(data?.product_id);
+}
+
+// ---------- Джерела ----------
+export async function createSource(fd: FormData) {
+  const { supabase } = await db();
+  const productId = str(fd, "product_id");
+  const { error } = await supabase.from("research_sources").insert({
+    url: str(fd, "url") ?? "",
+    title: str(fd, "title") ?? str(fd, "url") ?? "Без назви",
+    publisher: str(fd, "publisher"),
+    kind: str(fd, "kind") ?? "other",
+    topic: str(fd, "topic") ?? "попит",
+    reliability: numOrNull(fd, "reliability"),
+    finding: str(fd, "finding"),
+    product_id: productId,
+    published_on: str(fd, "published_on"),
+  });
+  check(error);
+  revalidatePath("/sources");
+  if (productId) revalidatePath(`/products/${productId}`);
+}
+
+export async function deleteSource(fd: FormData) {
+  const { supabase } = await db();
+  check((await supabase.from("research_sources").delete().eq("id", str(fd, "id")!)).error);
+  revalidatePath("/sources");
 }

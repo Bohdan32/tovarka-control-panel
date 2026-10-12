@@ -1,8 +1,11 @@
 import { requireMember } from "@/lib/auth";
 import { productOptions } from "@/lib/products";
 import { createBatch, updateBatch } from "../actions";
-import { Badge, Button, Card, Field, FormGrid, PageHeader, Select, Table, Td } from "@/components/ui";
+import type { Metadata } from "next";
+import { AddForm, Badge, Button, Card, Field, FormGrid, PageHeader, Select, Stat, Stats, Table, Td, miniInput } from "@/components/ui";
 import { BATCH_STATUSES, date, money } from "@/lib/format";
+
+export const metadata: Metadata = { title: "Склад" };
 
 export default async function InventoryPage() {
   const { supabase } = await requireMember();
@@ -12,9 +15,23 @@ export default async function InventoryPage() {
     productOptions(supabase),
   ]);
 
+  const all = batches.data ?? [];
+  const units = (stock.data ?? []).reduce((a, s) => a + Number(s.in_stock), 0);
+  const incoming = (stock.data ?? []).reduce((a, s) => a + Number(s.incoming), 0);
+  const spent = all.reduce((a, b) => a + Number(b.total_cost_uah), 0);
+  const low = (stock.data ?? []).filter((s) => Number(s.in_stock) <= 5).length;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader title="Склад і закупівлі" subtitle="Залишок = партії на складі мінус підтверджені, відправлені й отримані замовлення." />
+      <Stats>
+        <Stat label="На складі" value={`${units} шт`} />
+        <Stat label="В дорозі" value={`${incoming} шт`} />
+        <Stat label="Партій" value={all.length} />
+        <Stat label="Вкладено в партії" value={money(spent)} />
+        <Stat label="Середня за од." value={money(all.length ? spent / Math.max(all.reduce((a, b) => a + b.qty, 0), 1) : null)} />
+        <Stat label="Закінчуються" value={low} tone={low ? "warn" : "good"} hint="≤ 5 шт" />
+      </Stats>
       <Card title="Залишки">
         <Table head={["Товар", "На складі", "В дорозі"]} empty={!stock.data?.length}>
           {stock.data?.map((s) => (
@@ -38,17 +55,18 @@ export default async function InventoryPage() {
               <Td>
                 <form action={updateBatch} className="flex gap-1">
                   <input type="hidden" name="id" value={b.id} />
-                  <select name="status" defaultValue={b.status} className="rounded border border-black/15 dark:border-white/15 dark:bg-zinc-950">
+                  <select name="status" defaultValue={b.status} className={miniInput}>
                     {Object.entries(BATCH_STATUSES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                   </select>
-                  <button className="text-sky-600">ok</button>
+                  <button className="rounded-md bg-indigo-600 px-2 text-xs font-medium text-white">ok</button>
                 </form>
               </Td>
             </tr>
           ))}
         </Table>
-        <form action={createBatch} className="mt-6 space-y-3 border-t border-black/10 pt-4 dark:border-white/10">
-          <h3 className="text-sm font-semibold">Нова партія</h3>
+      </Card>
+      <AddForm title="Нова партія">
+        <form action={createBatch} className="space-y-2.5">
           <FormGrid>
             <Select label="Товар" name="product_id" options={products} />
             <Field label="Кількість, шт" name="qty" type="number" required />
@@ -57,7 +75,7 @@ export default async function InventoryPage() {
           </FormGrid>
           <Button>Додати партію</Button>
         </form>
-      </Card>
+      </AddForm>
     </div>
   );
 }
