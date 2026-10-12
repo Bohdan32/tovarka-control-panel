@@ -11,7 +11,7 @@ const SCENARIOS = [
 ] as const;
 
 const fmt = new Intl.NumberFormat("uk-UA", { maximumFractionDigits: 0 });
-const uah = (v: number) => `${fmt.format(Math.round(v))} грн`;
+const uah = (v: number) => fmt.format(Math.round(v));
 
 function Num({ label, value, onChange, step = 1, suffix }: {
   label: string; value: number; onChange: (v: number) => void; step?: number; suffix?: string;
@@ -71,9 +71,9 @@ export function Simulator({ products, taxPct }: { products: SimProduct[]; taxPct
 
   const line = (label: string, get: (r: (typeof rows)[number]) => string, strong = false) => (
     <tr className="border-t border-black/[.06] dark:border-white/5">
-      <td className="py-1.5 pr-2 text-zinc-500">{label}</td>
+      <td className="whitespace-normal py-1.5 pr-2 text-zinc-500">{label}</td>
       {rows.map((r) => (
-        <td key={r.s.key} className={`py-1.5 text-right tabular-nums ${strong ? `font-semibold ${r.s.tone}` : ""}`}>{get(r)}</td>
+        <td key={r.s.key} className={`py-1.5 pl-3 text-right tabular-nums ${strong ? `font-semibold ${r.s.tone}` : ""}`}>{get(r)}</td>
       ))}
     </tr>
   );
@@ -119,30 +119,30 @@ export function Simulator({ products, taxPct }: { products: SimProduct[]; taxPct
       </details>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[22rem] text-sm">
+        <table className="w-full whitespace-nowrap text-[13px] sm:text-sm">
           <thead>
             <tr className="text-xs text-zinc-500">
-              <th className="pb-1.5 text-left font-medium">За {days} днів</th>
-              {rows.map((r) => <th key={r.s.key} className={`pb-1.5 text-right font-semibold ${r.s.tone}`}>{r.s.label}</th>)}
+              <th className="pb-1.5 text-left font-medium">За {days} днів, грн</th>
+              {rows.map((r) => <th key={r.s.key} className={`pb-1.5 pl-3 text-right font-semibold ${r.s.tone}`}>{r.s.label}</th>)}
             </tr>
           </thead>
           <tbody>
             {line("Реклама", (r) => uah(r.ads))}
             {line("Замовлень", (r) => fmt.format(Math.round(r.orders)))}
-            {line("Викуплено", (r) => `${fmt.format(Math.round(r.sold))} шт`)}
+            {line("Викуплено, шт", (r) => fmt.format(Math.round(r.sold)))}
             {line("Відмов", (r) => fmt.format(Math.round(r.refused)))}
             {line("Виручка", (r) => uah(r.revenue))}
             {line("Комісії і податок", (r) => uah(r.fees))}
             {line("Склад, доставка, відмови", (r) => uah(r.logistics))}
             {line("Прибуток з проданого", (r) => uah(r.month), true)}
             {line("На одному продажу", (r) => uah(r.profitPerSold))}
-            {line("Лишилось на складі", (r) => `${fmt.format(Math.round(r.left))} шт`)}
+            {line("Лишилось на складі, шт", (r) => fmt.format(Math.round(r.left)))}
             {line("Гроші зараз (з партією)", (r) => uah(r.cash), true)}
           </tbody>
         </table>
       </div>
       <p className="text-xs text-zinc-500">
-        «Гроші зараз» — скільки ти в плюсі чи мінусі з урахуванням того, що вся партія ({uah(qty * landed)}) уже оплачена. Залишок на складі ще можна продати.
+        «Гроші зараз» — скільки ти в плюсі чи мінусі з урахуванням того, що вся партія ({uah(qty * landed)} грн) уже оплачена. Залишок на складі ще можна продати.
       </p>
     </div>
   );

@@ -117,16 +117,17 @@ export default async function ProductsPage({ searchParams }: PageProps<"/product
                 <div>
                   <dt className="text-[11px] text-zinc-500">Маржа</dt>
                   <dd className={`font-medium tabular-nums ${m !== null && m < 0.3 ? "text-red-600 dark:text-red-400" : m !== null ? "text-emerald-600 dark:text-emerald-400" : ""}`}>{pct(m)}</dd>
-                  {p.sellers && <dd className="text-[11px] text-zinc-500">{p.sellers}</dd>}
                 </div>
               </dl>
+              {p.sellers && <p className="mt-1 text-[11px] text-zinc-500">Конкуренти: {p.sellers}</p>}
               <div className="mt-2"><Progress value={(p.score ?? 0) / 100} tone={(p.score ?? 0) >= 65 ? "green" : "indigo"} /></div>
 
-              {p.thesis && <p className="mt-3 text-sm text-zinc-700 dark:text-zinc-300">{p.thesis}</p>}
+              {p.thesis && <p className="mt-3 line-clamp-4 text-sm text-zinc-700 dark:text-zinc-300">{p.thesis}</p>}
 
               <details className="mt-2 text-sm">
-                <summary className="cursor-pointer text-xs font-medium text-indigo-600 dark:text-indigo-400">Ризики, умова відмови, реклама, джерела ({src.length})</summary>
+                <summary className="cursor-pointer text-xs font-medium text-indigo-600 dark:text-indigo-400">Детальніше: ризики, реклама, джерела ({src.length})</summary>
                 <div className="mt-2 space-y-2 text-zinc-600 dark:text-zinc-400">
+                  {p.thesis && <p><b className="text-zinc-800 dark:text-zinc-200">Чому:</b> {p.thesis}</p>}
                   {p.risks && <p><b className="text-zinc-800 dark:text-zinc-200">Ризики:</b> {p.risks}</p>}
                   {p.kill_criteria && <p><b className="text-zinc-800 dark:text-zinc-200">Відмовляємось, якщо:</b> {p.kill_criteria}</p>}
                   {p.where_to_sell && <p><b className="text-zinc-800 dark:text-zinc-200">Де продавати:</b> {p.where_to_sell}</p>}
