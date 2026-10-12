@@ -502,3 +502,56 @@ export async function askTaskHelp(fd: FormData) {
   check(error);
   revalidateTasks(data?.product_id);
 }
+
+// ---------- Замовлення: прибуття, чорний список ----------
+export async function markArrived(fd: FormData) {
+  const { supabase } = await db();
+  const arrived = str(fd, "undo") ? null : new Date().toISOString();
+  check((await supabase.from("orders").update({ arrived_at: arrived }).eq("id", str(fd, "id")!)).error);
+  revalidatePath("/orders");
+  revalidatePath("/");
+}
+
+export async function addBlacklist(fd: FormData) {
+  const { supabase } = await db();
+  const digits = (str(fd, "phone") ?? "").replace(/\D/g, "");
+  if (digits.length < 9) throw new Error("Телефон замалий");
+  const { error } = await supabase.from("blacklist").upsert({ phone: `380${digits.slice(-9)}`, reason: str(fd, "reason") });
+  check(error);
+  revalidatePath("/orders");
+}
+
+export async function removeBlacklist(fd: FormData) {
+  const { supabase } = await db();
+  check((await supabase.from("blacklist").delete().eq("phone", str(fd, "phone")!)).error);
+  revalidatePath("/orders");
+}
+
+// ---------- Банк питань покупців ----------
+export async function saveQuestion(fd: FormData) {
+  const { supabase } = await db();
+  const question = str(fd, "question");
+  if (!question) return;
+  const { data: same } = await supabase.from("customer_questions").select("id, times").ilike("question", question.replace(/[%_\\]/g, "\\$&")).limit(1).maybeSingle();
+  if (same) {
+    check((await supabase.from("customer_questions").update({ times: same.times + 1 }).eq("id", same.id)).error);
+  } else {
+    check((await supabase.from("customer_questions").insert({ question, answer: str(fd, "answer"), product_id: str(fd, "product_id") })).error);
+  }
+  revalidatePath("/sell");
+}
+
+export async function updateQuestion(fd: FormData) {
+  const { supabase } = await db();
+  const id = str(fd, "id")!;
+  if (str(fd, "delete")) {
+    check((await supabase.from("customer_questions").delete().eq("id", id)).error);
+  } else {
+    check((await supabase.from("customer_questions").update({
+      answer: str(fd, "answer"),
+      times: numOrNull(fd, "times") ?? 1,
+      in_listing: fd.get("in_listing") === "on",
+    }).eq("id", id)).error);
+  }
+  revalidatePath("/sell");
+}

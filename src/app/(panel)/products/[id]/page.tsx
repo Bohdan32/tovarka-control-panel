@@ -9,6 +9,7 @@ import { BATCH_CHECKS } from "@/lib/checks";
 import { Icon } from "@/components/icons";
 import { AddForm, Badge, Button, Card, Ext, Field, FormGrid, PageHeader, Progress, Select, Stat, Stats, Table, Td, TextArea } from "@/components/ui";
 import { TaskList, sortTasks, type TaskRow } from "@/components/tasks";
+import { PricingCard } from "@/components/pricing";
 import { SOURCE_KINDS, SOURCE_TOPICS, STAGES, date, landedEstimate, money, num, pct, roughMargin, usd } from "@/lib/format";
 
 function Thesis({ label, text, tone }: { label: string; text: string | null; tone?: "red" | "amber" }) {
@@ -32,7 +33,7 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
     supabase.from("suppliers").select("id, name").order("name"),
     supabase.from("research_sources").select("*").eq("product_id", id).order("checked_on", { ascending: false }),
     supabase.from("tasks").select("*, products(name), playbook_steps(n, title)").eq("product_id", id),
-    supabase.from("cost_settings").select("usd_rate").eq("id", 1).single(),
+    supabase.from("cost_settings").select("usd_rate, fee_pct, tax_pct, default_cpa_uah, refusal_rate, return_shipping_uah").eq("id", 1).single(),
   ]);
   if (!p) notFound();
 
@@ -93,6 +94,15 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
           </form>
         </Card>
       </div>
+
+      <PricingCard
+        price={selected?.price_uah != null ? Number(selected.price_uah) : p.price_median_uah != null ? Number(p.price_median_uah) : null}
+        landed={selected ? Number(selected.landed_cost_uah) : estLanded}
+        fee={Number(selected?.fee_pct ?? settings?.fee_pct ?? 0.02) + Number(settings?.tax_pct ?? 0.06)}
+        cpa={Number(selected?.cpa_uah ?? p.planned_cpa_uah ?? settings?.default_cpa_uah ?? 120)}
+        reserve={Number(selected?.refusal_reserve_uah ?? Number(settings?.refusal_rate ?? 0.15) * Number(settings?.return_shipping_uah ?? 80))}
+        market={selected?.market_median_uah != null ? Number(selected.market_median_uah) : p.price_median_uah != null ? Number(p.price_median_uah) : null}
+      />
 
       {p.stage !== "rejected" && (() => {
         const checked: string[] = p.batch_check ?? [];

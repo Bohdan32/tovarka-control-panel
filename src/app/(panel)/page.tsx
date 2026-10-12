@@ -5,6 +5,7 @@ import { Markdown } from "@/components/markdown";
 import { TaskList, sortTasks, type TaskRow } from "@/components/tasks";
 import { Icon } from "@/components/icons";
 import { buildCalendar } from "@/lib/calendar";
+import { LYING_DAYS, daysSince } from "@/lib/orders";
 import { compact, date, daysUntil, fitIssues, landedEstimate, money, pct, roughMargin } from "@/lib/format";
 
 const RAIL_DAYS = 55;
@@ -13,13 +14,15 @@ const hours = (min: number) => (min < 60 ? `${min} хв` : `${Math.round(min / 6
 
 export default async function Navigator() {
   const { supabase, member } = await requireMember();
-  const [{ data: steps }, { data: taskRows }, { data: products }, { data: reports }, { data: settings }, { data: events }] = await Promise.all([
+  const [{ data: steps }, { data: taskRows }, { data: products }, { data: reports }, { data: settings }, { data: events }, { data: shipped }, { data: campaigns }] = await Promise.all([
     supabase.from("playbook_steps").select("*").order("n"),
     supabase.from("tasks").select("*, products(name), playbook_steps(n, title)").neq("source", "claude"),
     supabase.from("products").select("*").neq("stage", "rejected").order("score", { ascending: false, nullsFirst: false }),
     supabase.from("analyst_reports").select("*").eq("role", "lead").order("created_at", { ascending: false }).limit(1),
     supabase.from("cost_settings").select("usd_rate, usd_rate_date").eq("id", 1).single(),
     supabase.from("calendar_events").select("kind, title, note, starts_on, ends_on"),
+    supabase.from("orders").select("arrived_at").eq("status", "shipped").not("arrived_at", "is", null),
+    supabase.from("campaign_performance").select("product_name, spend_uah, orders_count, cpa_max_uah").eq("status", "active").eq("orders_count", 0),
   ]);
   const tasks = (taskRows ?? []) as TaskRow[];
   const all = steps ?? [];
@@ -104,6 +107,18 @@ export default async function Navigator() {
               </div>
             </section>
           )}
+
+          {(() => {
+            const lying = (shipped ?? []).filter((o) => (daysSince(o.arrived_at) ?? 0) >= LYING_DAYS).length;
+            const stop = (campaigns ?? []).filter((c) => c.cpa_max_uah && Number(c.spend_uah) >= 2 * Number(c.cpa_max_uah));
+            if (!lying && !stop.length) return null;
+            return (
+              <div className="space-y-1 rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-800 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-300">
+                {lying > 0 && <p><Link href="/orders" className="font-semibold hover:underline">{lying} посил. лежать у відділенні 3+ дні →</Link> напиши покупцям, поки не поїхали назад.</p>}
+                {stop.length > 0 && <p><Link href="/marketing" className="font-semibold hover:underline">Зупини рекламу: {stop.map((c) => c.product_name).join(", ")} →</Link> дві допустимі ціни замовлення без продажу.</p>}
+              </div>
+            );
+          })()}
 
           {urgent.length > 0 && (
             <Card title="Не пропусти: є дедлайн">
