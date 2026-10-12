@@ -71,7 +71,7 @@ export default async function PlanPage({ searchParams }: PageProps<"/plan">) {
           const shown = sortTasks(visible.filter((t) => t.step_id === s.id));
           const complete = all.length > 0 && stepDone === all.length;
           return (
-            <details key={s.id} open={s.id === firstOpenStep} className="group rounded-xl border border-black/[.07] bg-white dark:border-white/10 dark:bg-zinc-900">
+            <details key={s.id} id={`step-${s.n}`} open={s.id === firstOpenStep} className="group rounded-xl border border-black/[.07] bg-white dark:border-white/10 dark:bg-zinc-900">
               <summary className="flex cursor-pointer items-center gap-3 p-3 sm:p-4">
                 <span className={`grid size-8 shrink-0 place-items-center rounded-full text-sm font-semibold ${complete ? "bg-emerald-500 text-white" : "bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300"}`}>
                   {complete ? "✓" : s.n}

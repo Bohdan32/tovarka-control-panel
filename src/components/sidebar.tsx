@@ -7,42 +7,44 @@ import { Icon } from "./icons";
 
 type Item = [href: string, label: string, icon: string];
 
-export const NAV: { group: string; items: Item[] }[] = [
+export const NAV: { group: string; items: Item[]; note?: string }[] = [
   {
     group: "Сьогодні",
     items: [
-      ["/", "Огляд", "home"],
-      ["/plan", "План і задачі", "plan"],
-      ["/analyst", "Аналітик", "spark"],
+      ["/", "Навігатор", "home"],
+      ["/plan", "План запуску", "plan"],
+      ["/sell", "Як продавати", "megaphone"],
     ],
   },
   {
     group: "Товар",
     items: [
-      ["/products", "Товари і попит", "box"],
-      ["/suppliers", "Постачальники", "factory"],
+      ["/products", "Банк товарів", "box"],
       ["/calculator", "Калькулятор", "calc"],
-      ["/investments", "Інвестиції", "chart"],
+      ["/suppliers", "Постачальники", "factory"],
       ["/sources", "Джерела", "book"],
+      ["/analyst", "Аналітик", "spark"],
     ],
   },
   {
-    group: "Продажі",
+    group: "Після запуску",
+    note: "заповнюються з першими продажами",
     items: [
-      ["/marketing", "Маркетинг", "megaphone"],
       ["/orders", "Замовлення", "cart"],
       ["/inventory", "Склад", "warehouse"],
       ["/finance", "Фінанси", "wallet"],
+      ["/investments", "Інвестиції", "chart"],
+      ["/marketing", "Реклама", "spark"],
     ],
   },
   { group: "Система", items: [["/settings", "Налаштування", "gear"]] },
 ];
 
 const TABS: Item[] = [
-  ["/", "Огляд", "home"],
+  ["/", "Сьогодні", "home"],
   ["/plan", "План", "plan"],
+  ["/sell", "Продаж", "megaphone"],
   ["/products", "Товари", "box"],
-  ["/orders", "Замовлення", "cart"],
 ];
 
 function isActive(href: string, pathname: string) {
@@ -56,9 +58,10 @@ export function Sidebar() {
 export function SidebarLinks({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
   return (
     <nav className="space-y-5">
-      {NAV.map(({ group, items }) => (
-        <div key={group}>
+      {NAV.map(({ group, items, note }) => (
+        <div key={group} className={note ? "opacity-70" : ""}>
           <div className="mb-1 px-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-400">{group}</div>
+          {note && <div className="-mt-0.5 mb-1 px-2.5 text-[11px] text-zinc-400">{note}</div>}
           <div className="space-y-0.5">
             {items.map(([href, label, icon]) => {
               const active = isActive(href, pathname);
