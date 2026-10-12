@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { requireMember } from "@/lib/auth";
+import type { Metadata } from "next";
 import { Badge, Card, PageHeader, Table, Td } from "@/components/ui";
 import { money, pct } from "@/lib/format";
 import { QuickCalc, type CalcSettings } from "./quick-calc";
+
+export const metadata: Metadata = { title: "Калькулятор" };
 
 export default async function CalculatorPage() {
   const { supabase } = await requireMember();
@@ -13,19 +16,19 @@ export default async function CalculatorPage() {
   const s = Object.fromEntries(Object.entries(settings ?? {}).map(([k, v]) => [k, Number(v)])) as CalcSettings;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
         title="Калькулятор ціни"
-        subtitle="Ціна = (собівартість + CPA + резерв на відмови) / (1 − маржа − комісія). Параметри — у Налаштуваннях."
+        subtitle="Ціна = (собівартість + CPA + резерв на відмови) / (1 − маржа − комісії − податки). Параметри — у Налаштуваннях."
       />
       <Card title="Швидкий розрахунок">
         <QuickCalc settings={s} />
       </Card>
-      <Card title="Усі пропозиції">
+      <Card title="Усі пропозиції" pad={false} className="p-2 sm:p-3">
         <Table head={["Товар", "Постачальник", "Собівартість", "Ціна", "Ринок", "Прибуток", "Маржа", "CPA max", ""]} empty={!rows?.length}>
           {rows?.map((e) => (
             <tr key={e.offer_id}>
-              <Td><Link href={`/products/${e.product_id}`} className="text-sky-600 hover:underline">{e.product_name}</Link></Td>
+              <Td><Link href={`/products/${e.product_id}`} className="text-indigo-600 hover:underline dark:text-indigo-400">{e.product_name}</Link></Td>
               <Td>{e.supplier_name ?? "—"}{e.is_selected && <> <Badge tone="blue">обрана</Badge></>}</Td>
               <Td>{money(e.landed_cost_uah)}</Td>
               <Td>{money(e.price_uah)}</Td>

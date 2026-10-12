@@ -1,11 +1,14 @@
 import "server-only";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
 export type Member = { email: string; displayName: string };
 
 // Data access gate: a signed-in user whose email is in public.members.
 export async function requireMember() {
+  // Member data is per request; also lets pages read the current date.
+  await connection();
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
   const email = data?.claims?.email as string | undefined;

@@ -1,8 +1,11 @@
 import { requireMember } from "@/lib/auth";
 import { productOptions } from "@/lib/products";
 import { createTransaction } from "../actions";
-import { Badge, Button, Card, Field, FormGrid, PageHeader, Select, Stat, Table, Td } from "@/components/ui";
+import type { Metadata } from "next";
+import { AddForm, Badge, Button, Card, Field, FormGrid, PageHeader, Select, Stat, Stats, Table, Td } from "@/components/ui";
 import { TX_KINDS, date, money } from "@/lib/format";
+
+export const metadata: Metadata = { title: "Фінанси" };
 
 const COSTS = ["purchase", "ads", "delivery", "other"];
 
@@ -31,16 +34,18 @@ export default async function FinancePage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader title="Фінанси" subtitle="Спільна каса: хто скільки вклав, куди пішли гроші, який прибуток." />
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <Stats>
         <Stat label="Вкладено" value={money(total(["investment"]))} />
         <Stat label="Виручка" value={money(revenue)} />
-        <Stat label="Витрати" value={money(costs)} />
+        <Stat label="Витрати" value={money(costs)} hint={`закупівля ${money(total(["purchase"]))}`} />
         <Stat label="Прибуток" value={money(profit)} tone={profit < 0 ? "bad" : "good"} />
-      </div>
+        <Stat label="Реклама" value={money(total(["ads"]))} hint={revenue ? `${Math.round((total(["ads"]) / revenue) * 100)}% виручки` : undefined} />
+        <Stat label="Податки ФОП, оцінка" value={money(revenue * 0.06)} hint="6% від виручки + ЄСВ 1 902/міс" />
+      </Stats>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2">
         <Card title="Партнери">
           <Table head={["Хто", "Частка", "Вклав", "Вивів", "Частка прибутку"]}>
             {members?.map((m) => {
@@ -84,8 +89,9 @@ export default async function FinancePage() {
             </tr>
           ))}
         </Table>
-        <form action={createTransaction} className="mt-6 space-y-3 border-t border-black/10 pt-4 dark:border-white/10">
-          <h3 className="text-sm font-semibold">Додати операцію</h3>
+      </Card>
+      <AddForm title="Додати операцію">
+        <form action={createTransaction} className="space-y-2.5">
           <FormGrid>
             <Select label="Тип" name="kind" options={TX_KINDS} />
             <Field label="Сума, грн" name="amount_uah" type="number" required />
@@ -97,7 +103,7 @@ export default async function FinancePage() {
           </FormGrid>
           <Button>Додати</Button>
         </form>
-      </Card>
+      </AddForm>
     </div>
   );
 }

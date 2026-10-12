@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { money } from "@/lib/format";
+import { inputCls } from "@/components/ui";
 
 export type PlanOffer = {
   offer_id: string; product_name: string; supplier_name: string | null; landed_cost_uah: number;
@@ -29,11 +30,11 @@ export function Planner({ offers }: { offers: PlanOffer[] }) {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <label className="block text-sm">
-          <span className="mb-1 block text-zinc-600 dark:text-zinc-400">Пропозиція</span>
+      <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+        <label className="col-span-2 block text-sm lg:col-span-1">
+          <span className="mb-1 block text-xs text-zinc-600 dark:text-zinc-400">Пропозиція</span>
           <select value={id} onChange={(e) => setId(e.target.value)}
-            className="w-full rounded-lg border border-black/15 bg-white px-3 py-2 text-sm dark:border-white/15 dark:bg-zinc-950">
+            className={inputCls}>
             {offers.map((x) => (
               <option key={x.offer_id} value={x.offer_id}>{x.product_name} · {x.supplier_name ?? "—"}</option>
             ))}
@@ -45,9 +46,9 @@ export function Planner({ offers }: { offers: PlanOffer[] }) {
           ["Інше (лендінг, зразки), грн", extra, setExtra],
         ].map(([label, value, set]) => (
           <label key={label as string} className="block text-sm">
-            <span className="mb-1 block text-zinc-600 dark:text-zinc-400">{label as string}</span>
+            <span className="mb-1 block text-xs text-zinc-600 dark:text-zinc-400">{label as string}</span>
             <input type="number" value={value as number} onChange={(e) => (set as (n: number) => void)(Number(e.target.value))}
-              className="w-full rounded-lg border border-black/15 bg-white px-3 py-2 text-sm dark:border-white/15 dark:bg-zinc-950" />
+              className={inputCls} />
           </label>
         ))}
       </div>

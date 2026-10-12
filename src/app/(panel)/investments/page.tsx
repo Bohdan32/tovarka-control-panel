@@ -1,5 +1,8 @@
 import { requireMember } from "@/lib/auth";
+import type { Metadata } from "next";
 import { Card, PageHeader } from "@/components/ui";
+
+export const metadata: Metadata = { title: "Інвестиції" };
 import { Planner, type PlanOffer } from "./planner";
 
 export default async function InvestmentsPage() {
@@ -18,7 +21,7 @@ export default async function InvestmentsPage() {
   }));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader title="Інвестиції" subtitle="Скільки вкласти в партію і що буде в трьох сценаріях." />
       <Card>
         <Planner offers={offers} />

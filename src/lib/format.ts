@@ -72,9 +72,52 @@ export const ASSET_KINDS: Record<string, string> = {
 
 export const ROLES: Record<string, string> = {
   lead: "Головний аналітик",
+  critic: "Адвокат диявола",
   scout: "Розвідник попиту",
   sourcer: "Закупівельник",
   finance: "Фінансист",
   marketing: "Маркетолог",
   auditor: "Ревізор",
 };
+
+export const TASK_STATUSES: Record<string, string> = {
+  todo: "Зробити",
+  doing: "В роботі",
+  done: "Готово",
+  skipped: "Пропущено",
+};
+
+export const PRIORITIES: Record<string, string> = { "1": "Високий", "2": "Звичайний", "3": "Низький" };
+
+export const SOURCE_KINDS: Record<string, string> = {
+  official: "Офіційне",
+  marketplace: "Маркетплейс",
+  trends: "Тренди / пошук",
+  media: "Медіа",
+  supplier: "Постачальник",
+  logistics: "Логістика",
+  community: "Спільнота / відгуки",
+  other: "Інше",
+};
+
+export const SOURCE_TOPICS = ["попит", "конкуренти", "постачальники", "податки", "логістика", "імпорт", "реклама", "ризики"];
+
+export function compact(v: number | string | null | undefined) {
+  if (v === null || v === undefined || v === "") return "—";
+  const n = Number(v);
+  if (Math.abs(n) >= 1_000_000) return `${dec.format(n / 1_000_000)} млн`;
+  if (Math.abs(n) >= 10_000) return `${uah.format(n / 1000)} тис.`;
+  return uah.format(n);
+}
+
+export function range(min: number | string | null, max: number | string | null, unit = "грн") {
+  if (min === null && max === null) return "—";
+  if (Number(min) === Number(max)) return `${compact(min)} ${unit}`;
+  return `${compact(min)}–${compact(max)} ${unit}`;
+}
+
+export function daysUntil(v: string | null | undefined) {
+  if (!v) return null;
+  const today = new Date(new Date().toISOString().slice(0, 10));
+  return Math.round((new Date(v).getTime() - today.getTime()) / 86_400_000);
+}

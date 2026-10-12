@@ -1,8 +1,17 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f6f7f9;
+  --foreground: #111827;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0b0d12;
+    --foreground: #e5e7eb;
+    color-scheme: dark;
+  }
 }
 
 @theme inline {
@@ -12,15 +21,71 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-feature-settings: "tnum" 1;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Таблиці на телефоні перетворюються на картки: кожна клітинка підписана назвою колонки. */
+@media (max-width: 639px) {
+  .rt thead {
+    display: none;
+  }
+  .rt,
+  .rt tbody,
+  .rt tr,
+  .rt td {
+    display: block;
+    width: 100%;
+  }
+  .rt tbody {
+    display: grid;
+    gap: 0.5rem;
+  }
+  .rt tr {
+    border: 1px solid rgb(0 0 0 / 0.08);
+    border-radius: 0.75rem;
+    padding: 0.5rem 0.75rem;
+  }
+  .rt td {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.25rem 0;
+    text-align: right;
+  }
+  .rt td[data-label]::before {
+    content: attr(data-label);
+    color: rgb(113 113 122);
+    font-size: 0.75rem;
+    text-align: left;
+    flex-shrink: 0;
+    padding-top: 0.1rem;
+  }
+  .rt td:first-child {
+    font-weight: 600;
+    text-align: left;
+  }
+  .rt td:first-child::before {
+    display: none;
+  }
+  .rt td:empty {
+    display: none;
+  }
+}
+
+@media (max-width: 639px) and (prefers-color-scheme: dark) {
+  .rt tr {
+    border-color: rgb(255 255 255 / 0.1);
+  }
+}
+
+details > summary {
+  list-style: none;
+}
+details > summary::-webkit-details-marker {
+  display: none;
 }
