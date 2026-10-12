@@ -1,5 +1,7 @@
+import { termify } from "./terms";
+
 // Minimal markdown for analyst reports and the launch plan: headings, lists, tables, bold, links, paragraphs.
-function inline(text: string) {
+function inline(text: string, seen?: Set<string>) {
   const parts = text.split(/(\*\*[^*]+\*\*|\[[^\]]+\]\([^)]+\))/g);
   return parts.map((p, i) => {
     if (p.startsWith("**") && p.endsWith("**")) return <strong key={i} className="font-semibold">{p.slice(2, -2)}</strong>;
@@ -15,13 +17,14 @@ function inline(text: string) {
         link[1]
       );
     }
-    return p;
+    return seen ? <span key={i}>{termify(p, seen)}</span> : p;
   });
 }
 
 const cells = (line: string) => line.trim().replace(/^\||\|$/g, "").split("|").map((c) => c.trim());
 
-export function Markdown({ text }: { text: string }) {
+export function Markdown({ text, terms = true }: { text: string; terms?: boolean }) {
+  const seen = terms ? new Set<string>() : undefined;
   const blocks: React.ReactNode[] = [];
   const lines = text.split("\n");
   let list: { ordered: boolean; items: string[] } | null = null;
@@ -30,7 +33,7 @@ export function Markdown({ text }: { text: string }) {
     const Tag = list.ordered ? "ol" : "ul";
     blocks.push(
       <Tag key={blocks.length} className={`ml-5 space-y-1 ${list.ordered ? "list-decimal" : "list-disc"}`}>
-        {list.items.map((l, i) => <li key={i}>{inline(l)}</li>)}
+        {list.items.map((l, i) => <li key={i}>{inline(l, seen)}</li>)}
       </Tag>,
     );
     list = null;
@@ -78,7 +81,7 @@ export function Markdown({ text }: { text: string }) {
 
     const h = line.match(/^(#{1,3}) (.*)$/);
     if (h) blocks.push(<h3 key={blocks.length} className="mt-3 font-semibold">{inline(h[2])}</h3>);
-    else blocks.push(<p key={blocks.length}>{inline(line)}</p>);
+    else blocks.push(<p key={blocks.length}>{inline(line, seen)}</p>);
   }
   flush();
   return <div className="space-y-2.5 text-sm leading-relaxed">{blocks}</div>;

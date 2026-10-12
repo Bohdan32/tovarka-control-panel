@@ -27,7 +27,10 @@ export default async function PlanPage({ searchParams }: PageProps<"/plan">) {
     productOptions(supabase),
   ]);
 
-  const tasks = (rows ?? []) as (TaskRow & { sort: number })[];
+  // Задачі з банку ідей — робота Claude над пультом, а не кроки запуску.
+  const all = (rows ?? []) as (TaskRow & { sort: number })[];
+  const tasks = all.filter((t) => t.source !== "claude");
+  const building = all.filter((t) => t.source === "claude");
   const closed = (t: TaskRow) => t.status === "done" || t.status === "skipped";
   const doneCount = tasks.filter(closed).length;
   const open = tasks.filter((t) => !closed(t));
@@ -114,6 +117,21 @@ export default async function PlanPage({ searchParams }: PageProps<"/plan">) {
         <Card title={`Інші задачі · ${loose.length}`}>
           <TaskList tasks={loose} showContext />
         </Card>
+      )}
+
+      {building.length > 0 && (
+        <details id="claude" className="rounded-xl border border-black/[.07] bg-white p-3 dark:border-white/10 dark:bg-zinc-900">
+          <summary className="cursor-pointer text-sm font-semibold">
+            Що будує Claude · {building.filter((t) => t.status === "done").length} з {building.length} готово
+            <span className="ml-1 font-normal text-zinc-500">— ідеї, які ти взяв у роботу; відмічати їх не треба</span>
+          </summary>
+          <ul className="mt-2 grid gap-x-4 gap-y-1 text-sm sm:grid-cols-2">
+            {building.map((t) => (
+              <li key={t.id} className={t.status === "done" ? "text-zinc-400 line-through" : t.status === "skipped" ? "hidden" : ""}>{t.title}</li>
+            ))}
+          </ul>
+          <a href="/ideas?v=doing" className="mt-2 inline-block text-xs text-indigo-600 hover:underline dark:text-indigo-400">Усі ідеї в роботі →</a>
+        </details>
       )}
 
       <AddForm title="Нова задача">

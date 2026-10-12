@@ -6,6 +6,7 @@ import { Markdown } from "@/components/markdown";
 import { Simulator, type SimProduct } from "@/components/simulator";
 import { CopyButton } from "@/components/copy";
 import { date, landedEstimate } from "@/lib/format";
+import { GLOSSARY } from "@/lib/glossary";
 
 export const metadata: Metadata = { title: "Як продавати" };
 
@@ -18,7 +19,7 @@ const FLOW = [
   ["groshi", "6", "Гроші: погано / нормально / добре", "Скільки можна втратити і заробити"],
 ] as const;
 
-const KINDS: Record<string, string> = { chat: "Відповіді в чат", listing: "Картка товару", ad: "Реклама", insert: "Вкладка в посилку" };
+const KINDS: Record<string, string> = { chat: "Відповіді в чат", supplier: "Постачальнику (англ. + кит.)", listing: "Картка товару", ad: "Реклама", insert: "Вкладка в посилку" };
 
 export default async function SellPage({ searchParams }: PageProps<"/sell">) {
   const { s } = await searchParams;
@@ -41,6 +42,7 @@ export default async function SellPage({ searchParams }: PageProps<"/sell">) {
     ...FLOW.map(([slug, , title]) => [`/sell?s=${slug}`, title] as [string, string]),
     ["/sell?s=simulator", "Симулятор"],
     ["/sell?s=texts", "Готові тексти"],
+    ["/sell?s=slovnyk", "Словник"],
   ];
 
   return (
@@ -84,13 +86,27 @@ export default async function SellPage({ searchParams }: PageProps<"/sell">) {
           <p className="mt-4 text-xs text-zinc-500">Оновлено {date(guide.updated_at)} · джерела з цифрами — на сторінці <Link href="/sources" className="text-indigo-600 hover:underline dark:text-indigo-400">Джерела</Link></p>
         </Card>
       )}
-      {section && !guide && section !== "simulator" && section !== "texts" && (
+      {section && !guide && section !== "simulator" && section !== "texts" && section !== "slovnyk" && (
         <Card><p className="text-sm text-zinc-500">Цей розділ аналітик ще дописує.</p></Card>
       )}
 
       {section === "simulator" && (
         <Card title="Симулятор першого місяця">
           <Simulator products={sim} taxPct={Number(settings?.tax_pct ?? 0.06)} />
+        </Card>
+      )}
+
+      {section === "slovnyk" && (
+        <Card title={`Словник · ${GLOSSARY.length} слів`}>
+          <p className="mb-2 text-xs text-zinc-500">Ці слова підкреслені пунктиром у плані, гайдах і задачах: натисни на слово — з’явиться пояснення.</p>
+          <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
+            {[...GLOSSARY].sort((a, b) => a[0].localeCompare(b[0], "uk")).map(([term, meaning]) => (
+              <div key={term}>
+                <dt className="text-sm font-semibold">{term}</dt>
+                <dd className="text-[13px] leading-snug text-zinc-600 dark:text-zinc-400">{meaning}</dd>
+              </div>
+            ))}
+          </dl>
         </Card>
       )}
 

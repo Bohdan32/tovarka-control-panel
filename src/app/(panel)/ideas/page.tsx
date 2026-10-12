@@ -43,7 +43,7 @@ export default async function IdeasPage({ searchParams }: PageProps<"/ideas">) {
     <div className="space-y-3">
       <PageHeader
         title="Ідеї"
-        subtitle="Що додати в пульт і в бізнес, з ефектом, обсягом роботи й ціною. Познач «Хочу», і Claude братиме ці ідеї в роботу першими; «→ у план» кладе ідею в задачі." />
+        subtitle="Що додати в пульт і в бізнес, з ефектом, обсягом роботи й ціною. «→ Claude, зроби» ставить ідею в мою чергу, і я будую такі ідеї пачками. «Хочу» піднімає ідею вище." />
       <Stats>
         <Stat label="Ідей" value={all.length} hint={`${all.filter((i) => i.impact === 3).length} з великим ефектом`} />
         <Stat label="Хочу" value={count("want")} href={q("want")} />

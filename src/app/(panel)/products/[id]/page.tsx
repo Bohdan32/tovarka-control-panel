@@ -3,9 +3,11 @@ import { notFound } from "next/navigation";
 import { requireMember } from "@/lib/auth";
 import { ConfirmButton } from "@/components/confirm";
 import {
-  addCompetitorPrice, addDemandSignal, addOffer, createSource, createTask, deleteOffer, deleteProduct, selectOffer, startTest, updateProduct,
+  addCompetitorPrice, addDemandSignal, addOffer, createSource, createTask, deleteOffer, deleteProduct, selectOffer, startTest, toggleBatchCheck, updateProduct,
 } from "../../actions";
-import { AddForm, Badge, Button, Card, Ext, Field, FormGrid, PageHeader, Select, Stat, Stats, Table, Td, TextArea } from "@/components/ui";
+import { BATCH_CHECKS } from "@/lib/checks";
+import { Icon } from "@/components/icons";
+import { AddForm, Badge, Button, Card, Ext, Field, FormGrid, PageHeader, Progress, Select, Stat, Stats, Table, Td, TextArea } from "@/components/ui";
 import { TaskList, sortTasks, type TaskRow } from "@/components/tasks";
 import { SOURCE_KINDS, SOURCE_TOPICS, STAGES, date, landedEstimate, money, num, pct, roughMargin, usd } from "@/lib/format";
 
@@ -91,6 +93,44 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
           </form>
         </Card>
       </div>
+
+      {p.stage !== "rejected" && (() => {
+        const checked: string[] = p.batch_check ?? [];
+        const ready = checked.length === BATCH_CHECKS.length;
+        const margin = selected?.margin ?? estMargin;
+        return (
+          <Card
+            title={ready ? "Перед партією: усе перевірено, можна замовляти" : `Перед замовленням партії · ${checked.length} з ${BATCH_CHECKS.length}`}
+            action={<span className="w-24"><Progress value={checked.length / BATCH_CHECKS.length} tone={ready ? "green" : "indigo"} /></span>}
+          >
+            {!ready && <p className="mb-2 text-xs text-zinc-500">Перша партія — найдорожча помилка новачка. Не замовляй, поки не відмічено всі пункти.</p>}
+            <ul className="grid gap-1 sm:grid-cols-2">
+              {BATCH_CHECKS.map(([key, label]) => {
+                const on = checked.includes(key);
+                return (
+                  <li key={key}>
+                    <form action={toggleBatchCheck}>
+                      <input type="hidden" name="product_id" value={p.id} />
+                      <input type="hidden" name="key" value={key} />
+                      <button type="submit" className="flex w-full items-start gap-2 rounded-lg p-1.5 text-left text-sm hover:bg-zinc-50 dark:hover:bg-white/5">
+                        <span className={`mt-0.5 grid size-4 shrink-0 place-items-center rounded border ${on ? "border-emerald-500 bg-emerald-500 text-white" : "border-black/25 dark:border-white/25"}`}>
+                          {on && <Icon name="check" className="size-3" />}
+                        </span>
+                        <span className={on ? "text-zinc-500 line-through" : ""}>
+                          {label}
+                          {key === "margin" && margin !== null && (
+                            <span className={`ml-1 no-underline ${margin >= 0.3 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>(зараз {pct(margin)})</span>
+                          )}
+                        </span>
+                      </button>
+                    </form>
+                  </li>
+                );
+              })}
+            </ul>
+          </Card>
+        );
+      })()}
 
       <AddForm title="Редагувати картку, тезу і ризики">
         <form action={updateProduct} className="space-y-2.5">

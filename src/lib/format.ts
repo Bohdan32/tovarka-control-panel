@@ -144,3 +144,25 @@ export function roughMargin(price: number | string | null | undefined, landed: n
   if (!p || landed === null) return null;
   return (p * (1 - cut) - landed) / p;
 }
+
+// Автофільтр банку товарів: «block» ховає товар, «warn» лише попереджає.
+export function fitIssues(p: { weight_kg?: number | string | null; price_median_uah?: number | string | null; fit_block?: string[] | null; fit_warn?: string[] | null }) {
+  const block = [...(p.fit_block ?? [])];
+  const warn = [...(p.fit_warn ?? [])];
+  const w = Number(p.weight_kg ?? 0);
+  const price = p.price_median_uah === null || p.price_median_uah === undefined ? null : Number(p.price_median_uah);
+  if (w > 1) block.push("важкий: понад 1 кг");
+  else if (w > 0.5 && !warn.some((x) => x.startsWith("об'ємн"))) warn.push("вага понад 0,5 кг");
+  if (price !== null && price < 300) block.push("дешевше 300 грн: реклама з'їсть прибуток");
+  return { block, warn };
+}
+
+export const NOT_FOR_US: [rule: string, why: string][] = [
+  ["Електроніка з акумулятором", "Гарантійні звернення, пожежна небезпека в доставці, фулфілмент НП приймає з обмеженнями."],
+  ["Косметика, дитячі іграшки, контакт з їжею", "Потрібна сертифікація і документи; без них маркетплейси знімають товар."],
+  ["Бренди і ліцензійні персонажі", "Підробки: блокування на Prom і Rozetka, претензії правовласників, партія лишається на складі."],
+  ["Крихке скло і рідини", "Б'ється і протікає в дорозі; повернення з'їдають прибуток."],
+  ["Важке й великогабаритне (понад 1 кг)", "Дорого везти з Китаю і по Україні; фулфілмент бере більше."],
+  ["Дешевше 300 грн для покупця", "Після реклами, доставки і комісій з такої ціни майже нічого не лишається."],
+  ["Харчове, ліки, легкозаймисте", "Заборонено або потребує ліцензій; фулфілмент не приймає."],
+];

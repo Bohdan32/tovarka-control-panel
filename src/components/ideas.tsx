@@ -67,11 +67,11 @@ export function IdeaCard({ i, showArea }: { i: Idea; showArea: boolean }) {
         ))}
         <span className="ml-auto">
           {i.task_id ? (
-            <Link href="/plan" className="text-xs text-emerald-600 hover:underline dark:text-emerald-400">у плані ✓</Link>
+            <Link href="/plan#claude" className="text-xs text-emerald-600 hover:underline dark:text-emerald-400">у черзі Claude ✓</Link>
           ) : i.status !== "done" && i.status !== "skip" ? (
             <form action={ideaToTask}>
               <input type="hidden" name="id" value={i.id} />
-              <button type="submit" className="text-xs text-indigo-600 hover:underline dark:text-indigo-400">→ у план</button>
+              <button type="submit" className="text-xs text-indigo-600 hover:underline dark:text-indigo-400">→ Claude, зроби</button>
             </form>
           ) : null}
         </span>
