@@ -1,0 +1,276 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { requireMember } from "@/lib/auth";
+import { numOrNull, pctOrNull, str } from "@/lib/form";
+
+async function db() {
+  const { supabase, member } = await requireMember();
+  return { supabase, member };
+}
+
+function check(error: { message: string } | null) {
+  if (error) throw new Error(error.message);
+}
+
+// ---------- Товари ----------
+export async function createProduct(fd: FormData) {
+  const { supabase } = await db();
+  const { data, error } = await supabase
+    .from("products")
+    .insert({
+      name: str(fd, "name") ?? "Без назви",
+      category: str(fd, "category"),
+      source_url: str(fd, "source_url"),
+      weight_kg: numOrNull(fd, "weight_kg"),
+      notes: str(fd, "notes"),
+    })
+    .select("id")
+    .single();
+  check(error);
+  redirect(`/products/${data!.id}`);
+}
+
+export async function updateProduct(fd: FormData) {
+  const { supabase } = await db();
+  const id = str(fd, "id")!;
+  const { error } = await supabase
+    .from("products")
+    .update({
+      name: str(fd, "name") ?? "Без назви",
+      category: str(fd, "category"),
+      stage: str(fd, "stage") ?? "idea",
+      score: numOrNull(fd, "score"),
+      weight_kg: numOrNull(fd, "weight_kg"),
+      target_price_uah: numOrNull(fd, "target_price_uah"),
+      planned_cpa_uah: numOrNull(fd, "planned_cpa_uah"),
+      source_url: str(fd, "source_url"),
+      notes: str(fd, "notes"),
+    })
+    .eq("id", id);
+  check(error);
+  revalidatePath(`/products/${id}`);
+}
+
+export async function deleteProduct(fd: FormData) {
+  const { supabase } = await db();
+  const { error } = await supabase.from("products").delete().eq("id", str(fd, "id")!);
+  check(error);
+  redirect("/products");
+}
+
+export async function addDemandSignal(fd: FormData) {
+  const { supabase } = await db();
+  const productId = str(fd, "product_id")!;
+  const { error } = await supabase.from("demand_signals").insert({
+    product_id: productId,
+    source: str(fd, "source") ?? "вручну",
+    metric: str(fd, "metric") ?? "нотатка",
+    value: numOrNull(fd, "value"),
+    note: str(fd, "note"),
+  });
+  check(error);
+  revalidatePath(`/products/${productId}`);
+}
+
+export async function addCompetitorPrice(fd: FormData) {
+  const { supabase } = await db();
+  const productId = str(fd, "product_id")!;
+  const { error } = await supabase.from("competitor_prices").insert({
+    product_id: productId,
+    marketplace: str(fd, "marketplace") ?? "Prom",
+    price_uah: numOrNull(fd, "price_uah"),
+    seller: str(fd, "seller"),
+    url: str(fd, "url"),
+  });
+  check(error);
+  revalidatePath(`/products/${productId}`);
+}
+
+// ---------- Постачальники і пропозиції ----------
+export async function createSupplier(fd: FormData) {
+  const { supabase } = await db();
+  const { error } = await supabase.from("suppliers").insert({
+    name: str(fd, "name") ?? "Без назви",
+    country: str(fd, "country") ?? "CN",
+    platform: str(fd, "platform"),
+    contact: str(fd, "contact"),
+    url: str(fd, "url"),
+    rating: numOrNull(fd, "rating"),
+    notes: str(fd, "notes"),
+  });
+  check(error);
+  revalidatePath("/suppliers");
+}
+
+export async function addOffer(fd: FormData) {
+  const { supabase } = await db();
+  const productId = str(fd, "product_id")!;
+  const { error } = await supabase.from("offers").insert({
+    product_id: productId,
+    supplier_id: str(fd, "supplier_id"),
+    unit_price_usd: numOrNull(fd, "unit_price_usd") ?? 0,
+    china_shipping_usd: numOrNull(fd, "china_shipping_usd") ?? 0,
+    weight_kg: numOrNull(fd, "weight_kg"),
+    moq: numOrNull(fd, "moq"),
+    lead_days: numOrNull(fd, "lead_days"),
+    url: str(fd, "url"),
+    notes: str(fd, "notes"),
+  });
+  check(error);
+  revalidatePath(`/products/${productId}`);
+}
+
+export async function selectOffer(fd: FormData) {
+  const { supabase } = await db();
+  const productId = str(fd, "product_id")!;
+  const offerId = str(fd, "offer_id")!;
+  check((await supabase.from("offers").update({ is_selected: false }).eq("product_id", productId)).error);
+  check((await supabase.from("offers").update({ is_selected: true }).eq("id", offerId)).error);
+  revalidatePath(`/products/${productId}`);
+}
+
+export async function deleteOffer(fd: FormData) {
+  const { supabase } = await db();
+  const productId = str(fd, "product_id")!;
+  check((await supabase.from("offers").delete().eq("id", str(fd, "offer_id")!)).error);
+  revalidatePath(`/products/${productId}`);
+}
+
+// ---------- Налаштування ----------
+export async function updateSettings(fd: FormData) {
+  const { supabase } = await db();
+  const { error } = await supabase
+    .from("cost_settings")
+    .update({
+      usd_rate: numOrNull(fd, "usd_rate") ?? undefined,
+      cargo_usd_per_kg: numOrNull(fd, "cargo_usd_per_kg") ?? undefined,
+      packaging_uah: numOrNull(fd, "packaging_uah") ?? undefined,
+      fee_pct: pctOrNull(fd, "fee_pct") ?? undefined,
+      target_margin: pctOrNull(fd, "target_margin") ?? undefined,
+      refusal_rate: pctOrNull(fd, "refusal_rate") ?? undefined,
+      return_shipping_uah: numOrNull(fd, "return_shipping_uah") ?? undefined,
+      default_cpa_uah: numOrNull(fd, "default_cpa_uah") ?? undefined,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", 1);
+  check(error);
+  revalidatePath("/settings");
+}
+
+export async function refreshRates() {
+  const { supabase } = await db();
+  check((await supabase.rpc("refresh_nbu_rates")).error);
+  revalidatePath("/settings");
+}
+
+// ---------- Замовлення ----------
+export async function createOrder(fd: FormData) {
+  const { supabase } = await db();
+  const { error } = await supabase.from("orders").insert({
+    product_id: str(fd, "product_id")!,
+    customer_name: str(fd, "customer_name"),
+    phone: str(fd, "phone"),
+    city: str(fd, "city"),
+    qty: numOrNull(fd, "qty") ?? 1,
+    price_uah: numOrNull(fd, "price_uah") ?? 0,
+    channel: str(fd, "channel"),
+    ttn: str(fd, "ttn"),
+    notes: str(fd, "notes"),
+  });
+  check(error);
+  revalidatePath("/orders");
+}
+
+export async function updateOrder(fd: FormData) {
+  const { supabase } = await db();
+  const { error } = await supabase
+    .from("orders")
+    .update({ status: str(fd, "status") ?? "new", ttn: str(fd, "ttn") })
+    .eq("id", str(fd, "id")!);
+  check(error);
+  revalidatePath("/orders");
+}
+
+// ---------- Склад ----------
+export async function createBatch(fd: FormData) {
+  const { supabase } = await db();
+  const { error } = await supabase.from("inventory_batches").insert({
+    product_id: str(fd, "product_id")!,
+    qty: numOrNull(fd, "qty") ?? 1,
+    total_cost_uah: numOrNull(fd, "total_cost_uah") ?? 0,
+    status: str(fd, "status") ?? "ordered",
+    notes: str(fd, "notes"),
+  });
+  check(error);
+  revalidatePath("/inventory");
+}
+
+export async function updateBatch(fd: FormData) {
+  const { supabase } = await db();
+  const status = str(fd, "status") ?? "ordered";
+  const { error } = await supabase
+    .from("inventory_batches")
+    .update({ status, arrived_on: status === "arrived" ? new Date().toISOString().slice(0, 10) : null })
+    .eq("id", str(fd, "id")!);
+  check(error);
+  revalidatePath("/inventory");
+}
+
+// ---------- Маркетинг ----------
+export async function createCampaign(fd: FormData) {
+  const { supabase } = await db();
+  const { error } = await supabase.from("ad_campaigns").insert({
+    product_id: str(fd, "product_id")!,
+    channel: str(fd, "channel") ?? "Meta",
+    name: str(fd, "name"),
+    spend_uah: numOrNull(fd, "spend_uah") ?? 0,
+    orders_count: numOrNull(fd, "orders_count") ?? 0,
+  });
+  check(error);
+  revalidatePath("/marketing");
+}
+
+export async function updateCampaign(fd: FormData) {
+  const { supabase } = await db();
+  const { error } = await supabase
+    .from("ad_campaigns")
+    .update({
+      spend_uah: numOrNull(fd, "spend_uah") ?? 0,
+      orders_count: numOrNull(fd, "orders_count") ?? 0,
+      status: str(fd, "status") ?? "active",
+    })
+    .eq("id", str(fd, "id")!);
+  check(error);
+  revalidatePath("/marketing");
+}
+
+export async function createAsset(fd: FormData) {
+  const { supabase } = await db();
+  const { error } = await supabase.from("marketing_assets").insert({
+    product_id: str(fd, "product_id"),
+    kind: str(fd, "kind") ?? "landing",
+    title: str(fd, "title") ?? "Без назви",
+    url: str(fd, "url"),
+    content: str(fd, "content"),
+    status: str(fd, "status") ?? "draft",
+  });
+  check(error);
+  revalidatePath("/marketing");
+}
+
+// ---------- Фінанси ----------
+export async function createTransaction(fd: FormData) {
+  const { supabase, member } = await db();
+  const { error } = await supabase.from("transactions").insert({
+    kind: str(fd, "kind") ?? "other",
+    amount_uah: numOrNull(fd, "amount_uah") ?? 0,
+    member_email: str(fd, "member_email") ?? member.email,
+    product_id: str(fd, "product_id"),
+    note: str(fd, "note"),
+    happened_on: str(fd, "happened_on") ?? undefined,
+  });
+  check(error);
+  revalidatePath("/finance");
+}
