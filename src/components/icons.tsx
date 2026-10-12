@@ -53,13 +53,13 @@ export function LogoMark({ className = "size-8" }: { className?: string }) {
   );
 }
 
-export function Logo() {
+export function Logo({ compact = false }: { compact?: boolean }) {
   return (
     <span className="flex items-center gap-2.5">
-      <LogoMark />
+      <LogoMark className={compact ? "size-7" : "size-8"} />
       <span className="leading-tight">
         <span className="block text-[15px] font-semibold tracking-tight">Товарка</span>
-        <span className="block text-[11px] text-zinc-500">пульт керування</span>
+        {!compact && <span className="block text-[11px] text-zinc-500">пульт керування</span>}
       </span>
     </span>
   );

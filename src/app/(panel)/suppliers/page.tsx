@@ -31,7 +31,7 @@ export default async function SuppliersPage() {
               <Td>{num(s.rating)}</Td>
               <Td>{s.offers?.[0]?.count ?? 0}</Td>
               <Td>{s.contact ?? "—"}</Td>
-              <Td className="max-w-xs text-zinc-500">{s.notes ?? ""}</Td>
+              <Td className="rt-wide max-w-xs text-zinc-500">{s.notes ?? ""}</Td>
             </tr>
           ))}
         </Table>

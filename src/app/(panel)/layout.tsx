@@ -5,7 +5,7 @@ import { Icon, Logo } from "@/components/icons";
 import { requireMember } from "@/lib/auth";
 import { logout } from "@/app/login/actions";
 
-async function CurrentUser() {
+async function CurrentUser({ compact = false }: { compact?: boolean }) {
   const { member } = await requireMember();
   return (
     <form action={logout} className="flex items-center justify-between gap-2 text-sm">
@@ -13,7 +13,7 @@ async function CurrentUser() {
         <span className="grid size-7 shrink-0 place-items-center rounded-full bg-zinc-200 text-xs font-semibold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
           {member.displayName.slice(0, 1)}
         </span>
-        <span className="truncate">{member.displayName}</span>
+        {!compact && <span className="truncate">{member.displayName}</span>}
       </span>
       <button type="submit" title="Вийти" className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-white/5 dark:hover:text-zinc-100">
         <Icon name="logout" />
@@ -40,11 +40,11 @@ export default function PanelLayout({ children }: LayoutProps<"/">) {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-20 flex items-center justify-between border-b border-black/[.07] bg-white/90 px-4 py-2.5 backdrop-blur lg:hidden dark:border-white/10 dark:bg-zinc-900/90">
-          <Link href="/"><Logo /></Link>
-          <Suspense><CurrentUser /></Suspense>
+        <header className="sticky top-0 z-20 flex h-12 items-center justify-between border-b border-black/[.07] bg-white/90 px-3 backdrop-blur lg:hidden dark:border-white/10 dark:bg-zinc-900/90">
+          <Link href="/"><Logo compact /></Link>
+          <Suspense><CurrentUser compact /></Suspense>
         </header>
-        <main className="mx-auto w-full max-w-7xl flex-1 px-3 pb-24 pt-4 sm:px-5 lg:px-8 lg:pb-10 lg:pt-6">{children}</main>
+        <main className="mx-auto w-full max-w-7xl flex-1 px-3 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-3 sm:px-5 sm:pt-4 lg:px-8 lg:pb-10 lg:pt-6">{children}</main>
       </div>
 
       <Suspense>
