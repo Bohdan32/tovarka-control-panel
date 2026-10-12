@@ -18,3 +18,7 @@ npm run dev
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Publishable key Supabase |
 
 На Vercel вони вже задані для всіх середовищ.
+
+## Деплой
+
+Кожен пуш у `main` автоматично деплоїться на Vercel у продакшн, інші гілки дають preview.
