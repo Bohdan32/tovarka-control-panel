@@ -4,10 +4,10 @@ import { Icon } from "./icons";
 
 export function PageHeader({ title, subtitle, children }: { title: string; subtitle?: ReactNode; children?: ReactNode }) {
   return (
-    <header className="mb-4 flex flex-wrap items-end justify-between gap-3">
+    <header className="mb-3 flex sm:mb-4 flex-wrap items-end justify-between gap-3">
       <div className="min-w-0">
         <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{title}</h1>
-        {subtitle && <p className="mt-0.5 text-sm text-zinc-500">{subtitle}</p>}
+        {subtitle && <div className="mt-0.5 text-[13px] leading-snug text-zinc-500 sm:text-sm">{subtitle}</div>}
       </div>
       {children && <div className="flex flex-wrap items-center gap-2">{children}</div>}
     </header>
@@ -31,7 +31,8 @@ export function Card({ title, action, children, className = "", pad = true }: {
 }
 
 export function Stats({ children }: { children: ReactNode }) {
-  return <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">{children}</div>;
+  // На телефоні — один рядок, що гортається вбік, а не екран карток.
+  return <div className="-mx-3 flex snap-x scroll-px-3 gap-2 overflow-x-auto px-3 pb-1 [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-4 xl:grid-cols-6 [&::-webkit-scrollbar]:hidden">{children}</div>;
 }
 
 export function Stat({ label, value, hint, tone, href }: {
@@ -40,12 +41,12 @@ export function Stat({ label, value, hint, tone, href }: {
   const color = tone === "good" ? "text-emerald-600 dark:text-emerald-400" : tone === "bad" ? "text-red-600 dark:text-red-400" : tone === "warn" ? "text-amber-600 dark:text-amber-400" : "";
   const body = (
     <>
-      <div className="truncate text-[11px] font-medium uppercase tracking-wide text-zinc-500">{label}</div>
-      <div className={`mt-0.5 truncate text-lg font-semibold tabular-nums sm:text-xl ${color}`}>{value}</div>
-      {hint && <div className="mt-0.5 truncate text-xs text-zinc-500">{hint}</div>}
+      <div className="truncate text-[10px] font-medium uppercase tracking-wide text-zinc-500 sm:text-[11px]">{label}</div>
+      <div className={`mt-0.5 truncate text-base font-semibold tabular-nums sm:text-xl ${color}`}>{value}</div>
+      {hint && <div className="mt-0.5 truncate text-[11px] text-zinc-500 sm:text-xs">{hint}</div>}
     </>
   );
-  const cls = "block min-w-0 rounded-xl border border-black/[.07] bg-white px-3 py-2 sm:py-2.5 dark:border-white/10 dark:bg-zinc-900";
+  const cls = "block w-[8.75rem] shrink-0 snap-start sm:w-auto sm:min-w-0 rounded-xl border border-black/[.07] bg-white px-3 py-2 sm:py-2.5 dark:border-white/10 dark:bg-zinc-900";
   return href ? <Link href={href} className={`${cls} hover:border-indigo-300 dark:hover:border-indigo-500/50`}>{body}</Link> : <div className={cls}>{body}</div>;
 }
 
@@ -107,11 +108,11 @@ export function Badge({ children, tone = "gray" }: { children: ReactNode; tone?:
 }
 
 export const inputCls =
-  "w-full rounded-lg border border-black/15 bg-white px-2.5 py-1.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-white/15 dark:bg-zinc-950";
+  "w-full rounded-lg border border-black/15 bg-white px-2.5 py-2 text-base outline-none transition sm:py-1.5 sm:text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-white/15 dark:bg-zinc-950";
 
 // Компактне поле для форм у рядках таблиць.
 export const miniInput =
-  "rounded-md border border-black/15 bg-white px-1.5 py-1 text-sm outline-none focus:border-indigo-500 dark:border-white/15 dark:bg-zinc-950";
+  "rounded-md border border-black/15 bg-white px-1.5 py-1 text-base outline-none sm:text-sm focus:border-indigo-500 dark:border-white/15 dark:bg-zinc-950";
 
 export function Field({ label, name, type = "text", defaultValue, placeholder, required, step }: {
   label: string; name: string; type?: string; defaultValue?: string | number | null; placeholder?: string; required?: boolean; step?: string;
@@ -171,7 +172,7 @@ export function Button({ children, variant = "primary", name, value }: {
   children: ReactNode; variant?: keyof typeof BTN; name?: string; value?: string;
 }) {
   return (
-    <button type="submit" name={name} value={value} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition ${BTN[variant]}`}>
+    <button type="submit" name={name} value={value} className={`inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm sm:py-1.5 font-medium transition ${BTN[variant]}`}>
       {children}
     </button>
   );

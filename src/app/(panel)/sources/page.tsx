@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requireMember } from "@/lib/auth";
+import { ConfirmButton } from "@/components/confirm";
 import { productOptions } from "@/lib/products";
 import { createSource, deleteSource } from "../actions";
 import { AddForm, Badge, Button, Card, Ext, Field, FormGrid, PageHeader, Pills, Select, Stat, Stats, Table, Td, TextArea } from "@/components/ui";
@@ -50,7 +51,7 @@ export default async function SourcesPage({ searchParams }: PageProps<"/sources"
                 <Ext href={s.url}>{s.title}</Ext>
                 <div className="text-xs text-zinc-500">{s.publisher ?? ""}{s.published_on && ` · ${date(s.published_on)}`}</div>
               </Td>
-              <Td className="max-w-md text-zinc-600 dark:text-zinc-400">{s.finding ?? "—"}</Td>
+              <Td className="rt-wide max-w-md text-zinc-600 dark:text-zinc-400">{s.finding ?? "—"}</Td>
               <Td><Badge>{SOURCE_KINDS[s.kind] ?? s.kind}</Badge></Td>
               <Td><Badge tone={(s.reliability ?? 0) >= 4 ? "green" : (s.reliability ?? 0) >= 3 ? "amber" : "red"}>{s.reliability ?? "?"}/5</Badge></Td>
               <Td>{s.product_id ? <Link href={`/products/${s.product_id}`} className="text-indigo-600 hover:underline dark:text-indigo-400">{s.products?.name}</Link> : "—"}</Td>
@@ -58,7 +59,7 @@ export default async function SourcesPage({ searchParams }: PageProps<"/sources"
               <Td>
                 <form action={deleteSource}>
                   <input type="hidden" name="id" value={s.id} />
-                  <button className="text-xs text-red-600 hover:underline">видалити</button>
+                  <ConfirmButton message="Видалити джерело?" className="text-xs text-red-600 hover:underline">видалити</ConfirmButton>
                 </form>
               </Td>
             </tr>

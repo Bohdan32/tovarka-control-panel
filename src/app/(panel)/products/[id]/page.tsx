@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireMember } from "@/lib/auth";
+import { ConfirmButton } from "@/components/confirm";
 import {
   addCompetitorPrice, addDemandSignal, addOffer, createSource, createTask, deleteOffer, deleteProduct, selectOffer, updateProduct,
 } from "../../actions";
@@ -46,7 +47,7 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
       >
         <form action={deleteProduct}>
           <input type="hidden" name="id" value={p.id} />
-          <Button variant="danger">Видалити</Button>
+          <ConfirmButton message="Видалити товар разом з пропозиціями, цінами і задачами?" className="rounded-lg px-2.5 py-1.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10">Видалити товар</ConfirmButton>
         </form>
       </PageHeader>
 
@@ -131,7 +132,7 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
                   <form action={deleteOffer} className="inline">
                     <input type="hidden" name="product_id" value={p.id} />
                     <input type="hidden" name="offer_id" value={e.offer_id!} />
-                    <button className="text-xs text-red-600 hover:underline">видалити</button>
+                    <ConfirmButton message="Видалити пропозицію?" className="text-xs text-red-600 hover:underline">видалити</ConfirmButton>
                   </form>
                 </Td>
               </tr>

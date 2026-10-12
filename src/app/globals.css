@@ -29,15 +29,14 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Таблиці на телефоні перетворюються на картки: кожна клітинка підписана назвою колонки. */
+/* Таблиці на телефоні перетворюються на компактні картки: перша клітинка — заголовок,
+   решта — пари «назва / значення» у дві колонки. */
 @media (max-width: 639px) {
   .rt thead {
     display: none;
   }
   .rt,
-  .rt tbody,
-  .rt tr,
-  .rt td {
+  .rt tbody {
     display: block;
     width: 100%;
   }
@@ -46,40 +45,61 @@ body {
     gap: 0.5rem;
   }
   .rt tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 0.75rem;
+    row-gap: 0.375rem;
     border: 1px solid rgb(0 0 0 / 0.08);
     border-radius: 0.75rem;
-    padding: 0.5rem 0.75rem;
+    padding: 0.625rem 0.75rem;
   }
   .rt td {
-    display: flex;
-    justify-content: space-between;
-    gap: 0.75rem;
-    padding: 0.25rem 0;
-    text-align: right;
+    display: block;
+    min-width: 0 !important;
+    max-width: none !important;
+    padding: 0 !important;
+    text-align: left;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
   }
   .rt td[data-label]::before {
     content: attr(data-label);
+    display: block;
     color: rgb(113 113 122);
-    font-size: 0.75rem;
-    text-align: left;
-    flex-shrink: 0;
-    padding-top: 0.1rem;
+    font-size: 0.6875rem;
+    line-height: 1rem;
   }
   .rt td:first-child {
+    grid-column: 1 / -1;
     font-weight: 600;
-    text-align: left;
   }
   .rt td:first-child::before {
     display: none;
   }
+  .rt td.rt-wide,
+  .rt td:not([data-label]) {
+    grid-column: 1 / -1;
+  }
   .rt td:empty {
     display: none;
+  }
+  /* Без картки в картці: обгортка таблиці зникає, лишаються картки рядків. */
+  section:has(> .rt-wrap),
+  section:has(> div > .rt) {
+    border: 0;
+    background: transparent;
+    padding: 0;
+    box-shadow: none;
+  }
+  .rt tr {
+    background: #fff;
   }
 }
 
 @media (max-width: 639px) and (prefers-color-scheme: dark) {
   .rt tr {
     border-color: rgb(255 255 255 / 0.1);
+    background: rgb(24 24 27);
   }
 }
 

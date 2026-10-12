@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ConfirmButton } from "./confirm";
 import { deleteTask, setTaskStatus, updateTask } from "@/app/(panel)/actions";
 import { Icon } from "./icons";
 import { Badge, Button, Field, inputCls } from "./ui";
@@ -90,7 +91,7 @@ export function TaskItem({ t, showContext }: { t: TaskRow; showContext?: boolean
             )}
             <form action={deleteTask}>
               <input type="hidden" name="id" value={t.id} />
-              <button className="text-xs text-red-600 hover:underline">Видалити</button>
+              <ConfirmButton message="Видалити задачу? Якщо вона просто не потрібна, краще «Не потрібно»." className="text-xs text-red-600 hover:underline">Видалити</ConfirmButton>
             </form>
           </div>
         </div>
