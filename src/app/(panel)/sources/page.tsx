@@ -16,7 +16,9 @@ export default async function SourcesPage({ searchParams }: PageProps<"/sources"
     supabase.from("research_sources").select("*, products(name)").order("checked_on", { ascending: false }).order("created_at", { ascending: false }),
     productOptions(supabase),
   ]);
-  const all = data ?? [];
+  // Одне й те саме посилання може прийти з кількох досліджень — показуємо раз.
+  const seen = new Set<string>();
+  const all = (data ?? []).filter((r) => { const k = `${r.url}|${r.product_id ?? ""}`; if (seen.has(k)) return false; seen.add(k); return true; });
   const rows = typeof topic === "string" ? all.filter((s) => s.topic === topic) : all;
   const topics = [...new Set([...SOURCE_TOPICS, ...all.map((s) => s.topic)])];
   const stale = all.filter((s) => (daysUntil(s.checked_on) ?? 0) < -60).length;

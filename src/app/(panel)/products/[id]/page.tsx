@@ -3,11 +3,11 @@ import { notFound } from "next/navigation";
 import { requireMember } from "@/lib/auth";
 import { ConfirmButton } from "@/components/confirm";
 import {
-  addCompetitorPrice, addDemandSignal, addOffer, createSource, createTask, deleteOffer, deleteProduct, selectOffer, updateProduct,
+  addCompetitorPrice, addDemandSignal, addOffer, createSource, createTask, deleteOffer, deleteProduct, selectOffer, startTest, updateProduct,
 } from "../../actions";
 import { AddForm, Badge, Button, Card, Ext, Field, FormGrid, PageHeader, Select, Stat, Stats, Table, Td, TextArea } from "@/components/ui";
 import { TaskList, sortTasks, type TaskRow } from "@/components/tasks";
-import { SOURCE_KINDS, SOURCE_TOPICS, STAGES, date, money, num, pct, usd } from "@/lib/format";
+import { SOURCE_KINDS, SOURCE_TOPICS, STAGES, date, landedEstimate, money, num, pct, roughMargin, usd } from "@/lib/format";
 
 function Thesis({ label, text, tone }: { label: string; text: string | null; tone?: "red" | "amber" }) {
   const color = tone === "red" ? "border-red-400" : tone === "amber" ? "border-amber-400" : "border-indigo-400";
@@ -22,7 +22,7 @@ function Thesis({ label, text, tone }: { label: string; text: string | null; ton
 export default async function ProductPage({ params }: PageProps<"/products/[id]">) {
   const { id } = await params;
   const { supabase } = await requireMember();
-  const [{ data: p }, signals, prices, economics, suppliers, sources, tasks] = await Promise.all([
+  const [{ data: p }, signals, prices, economics, suppliers, sources, tasks, { data: settings }] = await Promise.all([
     supabase.from("products").select("*").eq("id", id).maybeSingle(),
     supabase.from("demand_signals").select("*").eq("product_id", id).order("observed_on", { ascending: false }),
     supabase.from("competitor_prices").select("*").eq("product_id", id).order("price_uah"),
@@ -30,6 +30,7 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
     supabase.from("suppliers").select("id, name").order("name"),
     supabase.from("research_sources").select("*").eq("product_id", id).order("checked_on", { ascending: false }),
     supabase.from("tasks").select("*, products(name), playbook_steps(n, title)").eq("product_id", id),
+    supabase.from("cost_settings").select("usd_rate").eq("id", 1).single(),
   ]);
   if (!p) notFound();
 
@@ -37,6 +38,8 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
   const priceList = (prices.data ?? []).map((c) => Number(c.price_uah));
   const minPrice = priceList.length ? Math.min(...priceList) : null;
   const maxPrice = priceList.length ? Math.max(...priceList) : null;
+  const estLanded = landedEstimate(p, Number(settings?.usd_rate ?? 0));
+  const estMargin = roughMargin(p.price_median_uah, estLanded);
 
   return (
     <div className="space-y-4">
@@ -45,6 +48,12 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
         title={p.name}
         subtitle={<span className="flex flex-wrap items-center gap-1.5"><Badge tone="blue">{STAGES[p.stage]}</Badge>{p.category ?? "без категорії"}{p.source_url && <> · <Ext href={p.source_url}>джерело ідеї</Ext></>}</span>}
       >
+        {(p.stage === "idea" || p.stage === "demand") && (
+          <form action={startTest}>
+            <input type="hidden" name="product_id" value={p.id} />
+            <ConfirmButton message="Беремо в тест? Створю 9 задач: зразки, фото, партія, картка, реклама." className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500">Беру в тест</ConfirmButton>
+          </form>
+        )}
         <form action={deleteProduct}>
           <input type="hidden" name="id" value={p.id} />
           <ConfirmButton message="Видалити товар разом з пропозиціями, цінами і задачами?" className="rounded-lg px-2.5 py-1.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10">Видалити товар</ConfirmButton>
@@ -53,10 +62,10 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
 
       <Stats>
         <Stat label="Оцінка" value={p.score ?? "—"} hint={p.confidence !== null ? `впевненість ${p.confidence}%` : "впевненість не задана"} />
-        <Stat label="Собівартість" value={money(selected?.landed_cost_uah)} hint="до складу в Україні" />
+        <Stat label="Собівартість" value={selected ? money(selected.landed_cost_uah) : estLanded ? `≈ ${money(estLanded)}` : "—"} hint={selected ? "до складу в Україні" : "оцінка з банку"} />
         <Stat label="Ціна" value={money(selected?.price_uah)} hint={`рекомендована ${money(selected?.recommended_price_uah)}`} />
-        <Stat label="Ринок" value={money(selected?.market_median_uah)} hint={minPrice !== null ? `${money(minPrice)}–${money(maxPrice)} · ${priceList.length} цін` : "цін немає"} />
-        <Stat label="Маржа" value={pct(selected?.margin)} tone={selected ? (selected.passes ? "good" : "bad") : undefined} hint={`${money(selected?.profit_per_sale_uah)} з продажу`} />
+        <Stat label="Ринок" value={money(selected?.market_median_uah ?? p.price_median_uah)} hint={minPrice !== null ? `${money(minPrice)}–${money(maxPrice)} · ${priceList.length} цін` : p.price_min_uah ? `${money(p.price_min_uah)}–${money(p.price_max_uah)}` : "цін немає"} />
+        <Stat label="Маржа" value={pct(selected?.margin ?? estMargin)} tone={selected ? (selected.passes ? "good" : "bad") : undefined} hint={`${money(selected?.profit_per_sale_uah)} з продажу`} />
         <Stat label="CPA max" value={money(selected?.cpa_max_uah)} hint={`план ${money(selected?.cpa_uah)}`} />
       </Stats>
 
@@ -67,6 +76,8 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
             <Thesis label="Ризики" text={p.risks} tone="amber" />
             <Thesis label="Коли відмовляємось" text={p.kill_criteria} tone="red" />
             <Thesis label="Сезонність" text={p.seasonality} />
+            {p.where_to_sell && <Thesis label="Де продавати" text={p.where_to_sell} />}
+            {p.ad_angle && <Thesis label="Ідея реклами без обличчя" text={p.ad_angle} />}
             <div className="text-xs text-zinc-500">Наступний перегляд: {date(p.next_review_on)}</div>
           </div>
         </Card>

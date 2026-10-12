@@ -8,7 +8,7 @@ import { PRIORITIES, date, daysUntil, money } from "@/lib/format";
 export type TaskRow = {
   id: string; title: string; details: string | null; status: string; priority: number;
   due_on: string | null; cost_uah: number | string | null; source: string; step_id: string | null;
-  product_id: string | null; products?: { name: string } | null; playbook_steps?: { n: number; title: string } | null;
+  product_id: string | null; minutes?: number | null; products?: { name: string } | null; playbook_steps?: { n: number; title: string } | null;
 };
 
 function StatusButton({ id, status, icon, title, active }: { id: string; status: string; icon: string; title: string; active?: boolean }) {
@@ -55,6 +55,7 @@ export function TaskItem({ t, showContext }: { t: TaskRow; showContext?: boolean
                 до {date(t.due_on)}
               </Badge>
             )}
+            {t.minutes && !done && <span>≈ {t.minutes < 60 ? `${t.minutes} хв` : `${Math.round(t.minutes / 6) / 10} год`}</span>}
             {Number(t.cost_uah) > 0 && <span>{money(t.cost_uah)}</span>}
             {showContext && t.playbook_steps && <span>Крок {t.playbook_steps.n}. {t.playbook_steps.title}</span>}
             {showContext && t.products && t.product_id && (

@@ -368,3 +368,53 @@ export async function deleteSource(fd: FormData) {
   check((await supabase.from("research_sources").delete().eq("id", str(fd, "id")!)).error);
   revalidatePath("/sources");
 }
+
+// ---------- Тест товару ----------
+// «Беру в тест»: товар іде в роботу, а під нього одразу з'являються всі кроки запуску.
+const TEST_STEPS: [title: string, details: string, minutes: number, days: number, cost: number | null, priority: number][] = [
+  ["Написати 3 постачальникам", "1688 / Alibaba: ціна за 100 і 300 шт, MOQ, вага з упаковкою, є штрихкод, фото упаковки. Пиши англійською або через перекладач.", 30, 2, null, 1],
+  ["Замовити 2–3 зразки", "Від різних постачальників, авіа. Порівняєш якість і упаковку.", 40, 4, 1500, 1],
+  ["Перевірити зразки", "Якість, розмір, запах, упаковка, чи не ламається. Обрати постачальника.", 20, 18, null, 1],
+  ["Зробити 8 фото і 2 короткі відео руками", "Телефон, денне світло, світлий фон. Без обличчя: руки, товар у дії, текст на екрані.", 90, 19, null, 2],
+  ["Перерахувати ціну в калькуляторі", "Внести реальну ціну постачальника і вагу. Якщо маржа < 30% — не замовляти партію.", 10, 19, null, 1],
+  ["Замовити пробну партію 100–200 шт", "Через «білий» карго з доставкою на склад фулфілменту Нової Пошти.", 60, 20, null, 1],
+  ["Створити картку на Prom і оголошення на OLX", "Текст і фото — з «Готових текстів». Телефон у картці не вказувати, тільки чат.", 60, 45, null, 2],
+  ["Запустити рекламу на 5 днів", "Бюджет і очікування — у симуляторі на сторінці «Як продавати».", 30, 50, 1500, 2],
+  ["Перевірити умову зупинки", "Через 14 днів після старту реклами: порівняти CPA і кількість замовлень з умовою відмови товару.", 10, 64, null, 1],
+];
+
+export async function startTest(fd: FormData) {
+  const { supabase } = await db();
+  const productId = str(fd, "product_id")!;
+  const { data: open } = await supabase.from("tasks").select("id").eq("product_id", productId).neq("status", "done").limit(1);
+  const { error } = await supabase
+    .from("products")
+    .update({ stage: "sourcing", in_test_at: new Date().toISOString() })
+    .eq("id", productId);
+  check(error);
+  if (!open?.length) {
+    const today = new Date();
+    const rows = TEST_STEPS.map(([title, details, minutes, days, cost, priority], i) => {
+      const due = new Date(today);
+      due.setDate(due.getDate() + days);
+      return {
+        title, details, minutes, priority, cost_uah: cost, sort: i + 1,
+        product_id: productId, due_on: due.toISOString().slice(0, 10), source: "manual",
+      };
+    });
+    const { error: e2 } = await supabase.from("tasks").insert(rows);
+    check(e2);
+  }
+  revalidateTasks(productId);
+  revalidatePath("/products");
+  redirect(`/products/${productId}`);
+}
+
+export async function rejectIdea(fd: FormData) {
+  const { supabase } = await db();
+  const productId = str(fd, "product_id")!;
+  const { error } = await supabase.from("products").update({ stage: "rejected" }).eq("id", productId);
+  check(error);
+  revalidatePath("/products");
+  revalidatePath("/");
+}

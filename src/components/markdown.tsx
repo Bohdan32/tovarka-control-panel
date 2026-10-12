@@ -59,7 +59,7 @@ export function Markdown({ text }: { text: string }) {
       i--;
       blocks.push(
         <div key={blocks.length} className="-mx-1 overflow-x-auto px-1">
-          <table className="w-full min-w-[28rem] border-collapse text-[13px]">
+          <table className="rt w-full border-collapse text-[13px] sm:min-w-[28rem]">
             <thead>
               <tr className="border-b border-black/10 text-left text-xs text-zinc-500 dark:border-white/10">
                 {head.map((h, k) => <th key={k} className="px-2 py-1.5 font-medium">{inline(h)}</th>)}
@@ -67,7 +67,7 @@ export function Markdown({ text }: { text: string }) {
             </thead>
             <tbody className="divide-y divide-black/[.05] dark:divide-white/5">
               {rows.map((r, k) => (
-                <tr key={k}>{r.map((c, m) => <td key={m} className={`px-2 py-1.5 align-top ${m === 0 ? "font-medium" : ""}`}>{inline(c)}</td>)}</tr>
+                <tr key={k}>{r.map((c, m) => <td key={m} data-label={head[m]?.replace(/\*\*/g, "") || undefined} className={`px-2 py-1.5 align-top ${m === 0 ? "font-medium" : ""}`}>{inline(c)}</td>)}</tr>
               ))}
             </tbody>
           </table>

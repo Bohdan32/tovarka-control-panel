@@ -121,3 +121,26 @@ export function daysUntil(v: string | null | undefined) {
   const today = new Date(new Date().toISOString().slice(0, 10));
   return Math.round((new Date(v).getTime() - today.getTime()) / 86_400_000);
 }
+
+// Оцінка собівартості на складі для банку товарів: середня ціна в Китаї + мито і ПДВ (~32%)
+// + залізниця з консолідацією (CARGO_USD_PER_KG) + приймання і упаковка. Точну рахує калькулятор.
+export const CARGO_USD_PER_KG = 3;
+const IMPORT_TAXES = 1.32;
+export function landedEstimate(
+  p: { cost_min_usd?: number | string | null; cost_max_usd?: number | string | null; weight_kg?: number | string | null },
+  usdRate: number,
+) {
+  const lo = Number(p.cost_min_usd ?? p.cost_max_usd);
+  const hi = Number(p.cost_max_usd ?? p.cost_min_usd);
+  if (!Number.isFinite(lo) || !Number.isFinite(hi) || (!lo && !hi) || !usdRate) return null;
+  const cost = (lo + hi) / 2;
+  const cargo = Number(p.weight_kg ?? 0.3) * CARGO_USD_PER_KG;
+  return (cost * IMPORT_TAXES + cargo) * usdRate + 10;
+}
+
+// Орієнтовна маржа до реклами: (ціна − собівартість − податок і комісія) / ціна.
+export function roughMargin(price: number | string | null | undefined, landed: number | null, cut = 0.16) {
+  const p = Number(price);
+  if (!p || landed === null) return null;
+  return (p * (1 - cut) - landed) / p;
+}
