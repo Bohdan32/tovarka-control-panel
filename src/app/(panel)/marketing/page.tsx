@@ -12,20 +12,24 @@ const ASSET_STATUS = { draft: "Чернетка", approved: "Погоджено"
 
 export default async function MarketingPage() {
   const { supabase } = await requireMember();
-  const [campaigns, assets, products] = await Promise.all([
+  const [campaigns, assets, products, { data: settings }] = await Promise.all([
     supabase.from("campaign_performance").select("*").order("started_on", { ascending: false }),
     supabase.from("marketing_assets").select("*, products(name)").order("created_at", { ascending: false }),
     productOptions(supabase),
+    supabase.from("cost_settings").select("default_cpa_uah").eq("id", 1).single(),
   ]);
 
   const rows = campaigns.data ?? [];
   const spend = rows.reduce((a, c) => a + Number(c.spend_uah), 0);
   const ordersCount = rows.reduce((a, c) => a + Number(c.orders_count), 0);
+  // Стоп-правило: дві допустимі ціни замовлення витрачено, а продажів немає.
+  const limitOf = (c: (typeof rows)[number]) => Number(c.cpa_max_uah ?? settings?.default_cpa_uah ?? 0);
+  const stop = rows.filter((c) => c.status === "active" && limitOf(c) > 0 && Number(c.orders_count) === 0 && Number(c.spend_uah) >= 2 * limitOf(c));
   const losing = rows.filter((c) => c.cpa_uah !== null && c.cpa_max_uah !== null && Number(c.cpa_uah) > Number(c.cpa_max_uah)).length;
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Маркетинг" subtitle="Реклама порівнюється з CPA max: якщо замовлення дорожче, кампанія йде в мінус." />
+      <PageHeader title="Маркетинг" subtitle="Реклама порівнюється з CPA max: якщо замовлення дорожче, кампанія йде в мінус. Дві CPA max без продажу — сигнал зупинитись." />
       <Stats>
         <Stat label="Кампаній" value={rows.length} hint={`${rows.filter((c) => c.status === "active").length} активних`} />
         <Stat label="Витрачено" value={money(spend)} />
@@ -34,6 +38,15 @@ export default async function MarketingPage() {
         <Stat label="У мінусі" value={losing} tone={losing ? "bad" : "good"} />
         <Stat label="Матеріалів" value={assets.data?.length ?? 0} hint={`${(assets.data ?? []).filter((a) => a.status === "live").length} працюють`} />
       </Stats>
+
+      {stop.length > 0 && (
+        <div className="rounded-xl border border-red-300 bg-red-50 p-3 text-sm dark:border-red-500/40 dark:bg-red-500/10">
+          <p className="font-semibold text-red-700 dark:text-red-300">Зупини рекламу: {stop.map((c) => `${c.product_name}${c.name ? ` (${c.name})` : ""}`).join(", ")}</p>
+          <p className="mt-1 text-red-700/80 dark:text-red-300/80">
+            Витрачено вже дві допустимі ціни замовлення, а продажів немає. «Ще трошки» тут не допоможе: міняй відео, ціну або товар, а не бюджет.
+          </p>
+        </div>
+      )}
 
       <Card title="Рекламні кампанії">
         <Table head={["Товар", "Канал", "Витрачено", "Замовлень", "CPA", "CPA max", "Статус", "Оновити"]} empty={!campaigns.data?.length}>
