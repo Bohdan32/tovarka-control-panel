@@ -46,6 +46,8 @@ export default async function Navigator() {
     .sort((a, b) => (a.left ?? 999) - (b.left ?? 999) || (b.score ?? 0) - (a.score ?? 0))
     .slice(0, 4);
   const lead = reports?.[0];
+  // Задачі з інших кроків, у яких скоро дедлайн (наприклад, акція з кінцем терміну).
+  const urgent = sortTasks(tasks.filter((t) => open(t) && t.step_id !== current?.id && !t.product_id && (daysUntil(t.due_on) ?? 99) <= 21)).slice(0, 3);
 
   return (
     <div className="space-y-4">
@@ -98,6 +100,12 @@ export default async function Navigator() {
                 {currentTasks.length > 3 && <span className="text-zinc-500">ще {currentTasks.length - 3} у цьому кроці</span>}
               </div>
             </section>
+          )}
+
+          {urgent.length > 0 && (
+            <Card title="Не пропусти: є дедлайн">
+              <TaskList tasks={urgent} showContext />
+            </Card>
           )}
 
           {inTest.length > 0 && (

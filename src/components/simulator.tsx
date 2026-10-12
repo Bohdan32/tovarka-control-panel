@@ -5,9 +5,9 @@ import { useMemo, useState } from "react";
 export type SimProduct = { id: string; name: string; price: number | null; landed: number | null };
 
 const SCENARIOS = [
-  { key: "worst", label: "Погано", cpa: 320, refusal: 0.25, tone: "text-red-600 dark:text-red-400" },
-  { key: "base", label: "Нормально", cpa: 180, refusal: 0.15, tone: "" },
-  { key: "best", label: "Добре", cpa: 100, refusal: 0.08, tone: "text-emerald-600 dark:text-emerald-400" },
+  { key: "worst", label: "Погано", cpa: 300, refusal: 0.2, tone: "text-red-600 dark:text-red-400" },
+  { key: "base", label: "Нормально", cpa: 150, refusal: 0.1, tone: "" },
+  { key: "best", label: "Добре", cpa: 70, refusal: 0.05, tone: "text-emerald-600 dark:text-emerald-400" },
 ] as const;
 
 const fmt = new Intl.NumberFormat("uk-UA", { maximumFractionDigits: 0 });
@@ -41,8 +41,8 @@ export function Simulator({ products, taxPct }: { products: SimProduct[]; taxPct
   const [days, setDays] = useState(30);
   const [fee, setFee] = useState(10);
   const [cod, setCod] = useState(80);
-  const [ret, setRet] = useState(140);
-  const [ful, setFul] = useState(35);
+  const [ret, setRet] = useState(180);
+  const [ful, setFul] = useState(30);
   const [cpa, setCpa] = useState<number[]>(SCENARIOS.map((s) => s.cpa));
   const [refusal, setRefusal] = useState<number[]>(SCENARIOS.map((s) => s.refusal * 100));
 
