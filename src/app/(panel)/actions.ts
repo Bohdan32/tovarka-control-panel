@@ -418,3 +418,50 @@ export async function rejectIdea(fd: FormData) {
   revalidatePath("/products");
   revalidatePath("/");
 }
+
+// ---------- Ідеї ----------
+const IDEA_STATUSES = ["new", "want", "doing", "done", "skip"];
+
+export async function setIdeaStatus(fd: FormData) {
+  const { supabase } = await db();
+  const status = str(fd, "status") ?? "new";
+  if (!IDEA_STATUSES.includes(status)) throw new Error("Невідомий статус");
+  check((await supabase.from("ideas").update({ status }).eq("id", str(fd, "id")!)).error);
+  revalidatePath("/ideas");
+}
+
+// Ідея → задача в плані, щоб вона з'явилась у навігаторі.
+export async function ideaToTask(fd: FormData) {
+  const { supabase } = await db();
+  const id = str(fd, "id")!;
+  const { data: idea, error } = await supabase.from("ideas").select("title, why, impact, task_id").eq("id", id).single();
+  check(error);
+  if (!idea!.task_id) {
+    const { data: task, error: e2 } = await supabase
+      .from("tasks")
+      .insert({ title: idea!.title, details: idea!.why, priority: idea!.impact === 3 ? 1 : 2, source: "manual" })
+      .select("id")
+      .single();
+    check(e2);
+    check((await supabase.from("ideas").update({ task_id: task!.id, status: "doing" }).eq("id", id)).error);
+  }
+  revalidatePath("/ideas");
+  revalidateTasks();
+}
+
+export async function createIdea(fd: FormData) {
+  const { supabase } = await db();
+  const { error } = await supabase.from("ideas").insert({
+    title: str(fd, "title") ?? "Без назви",
+    why: str(fd, "why"),
+    area: str(fd, "area") ?? "daily",
+    phase: str(fd, "phase") ?? "now",
+    impact: numOrNull(fd, "impact") ?? 2,
+    effort: numOrNull(fd, "effort") ?? 2,
+    cost: str(fd, "cost"),
+    status: "want",
+    sort: 1000,
+  });
+  check(error);
+  revalidatePath("/ideas");
+}

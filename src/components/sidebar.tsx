@@ -37,7 +37,13 @@ export const NAV: { group: string; items: Item[]; note?: string }[] = [
       ["/marketing", "Реклама", "spark"],
     ],
   },
-  { group: "Система", items: [["/settings", "Налаштування", "gear"]] },
+  {
+    group: "Система",
+    items: [
+      ["/ideas", "Ідеї", "bulb"],
+      ["/settings", "Налаштування", "gear"],
+    ],
+  },
 ];
 
 const TABS: Item[] = [
