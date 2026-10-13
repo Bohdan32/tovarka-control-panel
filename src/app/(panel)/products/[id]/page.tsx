@@ -3,13 +3,15 @@ import { notFound } from "next/navigation";
 import { requireMember } from "@/lib/auth";
 import { ConfirmButton } from "@/components/confirm";
 import {
-  addCompetitorPrice, addDemandSignal, addOffer, createSource, createTask, deleteOffer, deleteProduct, selectOffer, startTest, toggleBatchCheck, updateProduct,
+  addCompetitorPrice, addDemandSignal, addOffer, createSource, createTask, deleteOffer, deleteProduct, selectOffer, startTest, toggleBatchCheck, toggleListingCheck, updateProduct,
 } from "../../actions";
-import { BATCH_CHECKS } from "@/lib/checks";
+import { BATCH_CHECKS, LISTING_CHECKS } from "@/lib/checks";
 import { Icon } from "@/components/icons";
 import { AddForm, Badge, Button, Card, Ext, Field, FormGrid, PageHeader, Progress, Select, Stat, Stats, Table, Td, TextArea } from "@/components/ui";
 import { TaskList, sortTasks, type TaskRow } from "@/components/tasks";
 import { PricingCard } from "@/components/pricing";
+import { ScoreBars } from "@/components/score";
+import { scoreParts } from "@/lib/score";
 import { SOURCE_KINDS, SOURCE_TOPICS, STAGES, date, landedEstimate, money, num, pct, roughMargin, usd } from "@/lib/format";
 
 function Thesis({ label, text, tone }: { label: string; text: string | null; tone?: "red" | "amber" }) {
@@ -72,6 +74,10 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
         <Stat label="CPA max" value={money(selected?.cpa_max_uah)} hint={`план ${money(selected?.cpa_uah)}`} />
       </Stats>
 
+      <Card title={`З чого складається оцінка ${p.score ?? ""}`}>
+        <ScoreBars parts={scoreParts(p, selected?.margin != null ? Number(selected.margin) : estMargin, signals.data?.length ?? 0)} />
+      </Card>
+
       <div className="grid gap-4 lg:grid-cols-2">
         <Card title="Теза і ризики">
           <div className="space-y-3">
@@ -132,6 +138,38 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
                             <span className={`ml-1 no-underline ${margin >= 0.3 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>(зараз {pct(margin)})</span>
                           )}
                         </span>
+                      </button>
+                    </form>
+                  </li>
+                );
+              })}
+            </ul>
+          </Card>
+        );
+      })()}
+
+      {["economics", "test", "selling"].includes(p.stage) && (() => {
+        const done: string[] = p.listing_check ?? [];
+        const points = LISTING_CHECKS.filter(([k]) => done.includes(k)).reduce((a, [, , pts]) => a + pts, 0);
+        return (
+          <Card
+            title={`Якість картки на майданчику · ${points} з 100`}
+            action={<span className="w-24"><Progress value={points / 100} tone={points >= 80 ? "green" : "indigo"} /></span>}
+          >
+            <p className="mb-2 text-xs text-zinc-500">Від картки залежить, скільки людей клікне і купить. 80+ балів — можна запускати рекламу.</p>
+            <ul className="grid gap-1 sm:grid-cols-2">
+              {LISTING_CHECKS.map(([key, label, pts]) => {
+                const on = done.includes(key);
+                return (
+                  <li key={key}>
+                    <form action={toggleListingCheck}>
+                      <input type="hidden" name="product_id" value={p.id} />
+                      <input type="hidden" name="key" value={key} />
+                      <button type="submit" className="flex w-full items-start gap-2 rounded-lg p-1.5 text-left text-sm hover:bg-zinc-50 dark:hover:bg-white/5">
+                        <span className={`mt-0.5 grid size-4 shrink-0 place-items-center rounded border ${on ? "border-emerald-500 bg-emerald-500 text-white" : "border-black/25 dark:border-white/25"}`}>
+                          {on && <Icon name="check" className="size-3" />}
+                        </span>
+                        <span className={on ? "text-zinc-500 line-through" : ""}>{label} <span className="text-xs text-zinc-400">+{pts}</span></span>
                       </button>
                     </form>
                   </li>

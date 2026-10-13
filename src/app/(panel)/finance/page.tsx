@@ -63,6 +63,10 @@ export default async function FinancePage() {
             <dt className="font-medium">Відклади й не чіпай</dt><dd className="text-right font-semibold tabular-nums">{money(qRevenue * taxPct + ESV_MONTH * 3)}</dd>
           </dl>
           <p className="mt-2 text-xs text-zinc-500">ЄСВ — до {date(q.esvDue.toISOString())}, податок — до {date(q.taxDue.toISOString())}. ЄСВ платиш навіть без продажів.</p>
+          <div className="mt-2 flex gap-3 text-xs">
+            <a href="/finance/export" className="text-indigo-600 hover:underline dark:text-indigo-400">CSV за квартал для бухгалтера</a>
+            <a href="/finance/export?all=1" className="text-zinc-500 hover:underline">за весь час</a>
+          </div>
         </Card>
         <Card title="Ліміт доходу 3 групи">
           <div className="text-xl font-semibold tabular-nums">{pct(limitUsed)}</div>

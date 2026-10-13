@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireMember } from "@/lib/auth";
 import { numOrNull, pctOrNull, str } from "@/lib/form";
-import { BATCH_CHECKS } from "@/lib/checks";
+import { BATCH_CHECKS, LISTING_CHECKS } from "@/lib/checks";
 import { randomBytes } from "node:crypto";
 
 async function db() {
@@ -630,4 +630,17 @@ export async function inboxDone(fd: FormData) {
   const { supabase } = await db();
   check((await supabase.from("inbox").update({ done: true }).eq("id", str(fd, "id")!)).error);
   revalidatePath("/");
+}
+
+export async function toggleListingCheck(fd: FormData) {
+  const { supabase } = await db();
+  const productId = str(fd, "product_id")!;
+  const key = str(fd, "key")!;
+  if (!LISTING_CHECKS.some(([k]) => k === key)) throw new Error("Невідомий пункт");
+  const { data, error } = await supabase.from("products").select("listing_check").eq("id", productId).single();
+  check(error);
+  const current: string[] = data?.listing_check ?? [];
+  const next = current.includes(key) ? current.filter((k) => k !== key) : [...current, key];
+  check((await supabase.from("products").update({ listing_check: next }).eq("id", productId)).error);
+  revalidatePath(`/products/${productId}`);
 }

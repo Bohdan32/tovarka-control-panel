@@ -59,7 +59,9 @@ export default async function ProductsPage({ searchParams }: PageProps<"/product
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Банк товарів" subtitle="Кандидати, які знайшов аналітик: ціни на ринку і в Китаї, сезон, ризики і посилання. Обери один і натисни «Беру в тест» — план запуску під нього з'явиться сам." />
+      <PageHeader title="Банк товарів" subtitle="Кандидати, які знайшов аналітик: ціни на ринку і в Китаї, сезон, ризики і посилання. Обери один і натисни «Беру в тест» — план запуску під нього з'явиться сам.">
+        <Link href="/products/compare" className="rounded-lg border border-black/15 px-3 py-1.5 text-sm font-medium hover:border-indigo-400 dark:border-white/15">Порівняти 2–3</Link>
+      </PageHeader>
 
       <Stats>
         <Stat label="Кандидатів" value={live.length} />
