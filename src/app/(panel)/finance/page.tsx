@@ -4,7 +4,7 @@ import { createTransaction } from "../actions";
 import type { Metadata } from "next";
 import { AddForm, Badge, Button, Card, Field, FormGrid, PageHeader, Progress, Select, Stat, Stats, Table, Td } from "@/components/ui";
 import { TX_KINDS, date, money, pct } from "@/lib/format";
-import { ENVELOPES, ESV_MONTH, FOP3_LIMIT, MIN_WAGE_2026, quarterOf, yearStart } from "@/lib/money";
+import { ENVELOPES, ESV_MONTH, FOP3_LIMIT, MIN_WAGE_2026, productProfit, quarterOf, yearStart } from "@/lib/money";
 
 export const metadata: Metadata = { title: "Фінанси" };
 
@@ -12,12 +12,21 @@ const COSTS = ["purchase", "ads", "delivery", "other"];
 
 export default async function FinancePage() {
   const { supabase, member } = await requireMember();
-  const [{ data: txs }, { data: members }, products, { data: settings }] = await Promise.all([
+  const [{ data: txs }, { data: members }, products, { data: settings }, { data: orders }, { data: batches }, { data: ads }, { data: stock }] = await Promise.all([
     supabase.from("transactions").select("*, products(name)").order("happened_on", { ascending: false }),
     supabase.from("members").select("email, display_name, share_pct"),
     productOptions(supabase),
-    supabase.from("cost_settings").select("tax_pct").eq("id", 1).single(),
+    supabase.from("cost_settings").select("tax_pct, fee_pct, return_shipping_uah").eq("id", 1).single(),
+    supabase.from("orders").select("product_id, status, qty, price_uah, created_at, products(name)"),
+    supabase.from("inventory_batches").select("product_id, qty, total_cost_uah, status"),
+    supabase.from("ad_campaigns").select("product_id, spend_uah"),
+    supabase.from("product_stock").select("product_id, in_stock"),
   ]);
+  const report = productProfit({
+    orders: orders ?? [], batches: batches ?? [], ads: ads ?? [], stock: stock ?? [],
+    cut: Number(settings?.fee_pct ?? 0.02) + Number(settings?.tax_pct ?? 0.06),
+    returnShipping: Number(settings?.return_shipping_uah ?? 80),
+  });
   const all = txs ?? [];
   const total = (kinds: string[], rows = all) =>
     rows.filter((t) => kinds.includes(t.kind)).reduce((a, t) => a + Number(t.amount_uah), 0);
@@ -33,15 +42,6 @@ export default async function FinancePage() {
   const limitUsed = yearRevenue / FOP3_LIMIT;
   const withdrawn = total(["withdrawal"]);
 
-  const byProduct = new Map<string, { name: string; revenue: number; costs: number }>();
-  for (const t of all) {
-    if (!t.product_id) continue;
-    const row = byProduct.get(t.product_id) ?? { name: t.products?.name ?? "—", revenue: 0, costs: 0 };
-    if (t.kind === "revenue") row.revenue += Number(t.amount_uah);
-    if (COSTS.includes(t.kind)) row.costs += Number(t.amount_uah);
-    byProduct.set(t.product_id, row);
-  }
-
   return (
     <div className="space-y-4">
       <PageHeader title="Фінанси" subtitle="Спільна каса: хто скільки вклав, куди пішли гроші, який прибуток." />
@@ -54,7 +54,14 @@ export default async function FinancePage() {
         <Stat label={`Податок за ${q.n} квартал`} value={money(qRevenue * taxPct + ESV_MONTH * 3)} hint={`до ${date(q.taxDue.toISOString())}: ${pct(taxPct)} + ЄСВ`} tone="warn" />
       </Stats>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Card title="Коли повернуться гроші">
+          <div className="text-xl font-semibold tabular-nums">{money(report.frozen)}</div>
+          <p className="text-xs text-zinc-500">заморожено в партіях у дорозі й на складі</p>
+          <p className="mt-2 text-sm">
+            {report.frozen <= 0 ? "Зараз нічого не заморожено." : report.daysBack === null ? "Темп з’явиться після перших отриманих замовлень." : <>За темпом останніх 30 днів повернуться за <b>{report.daysBack} дн.</b>, приблизно до {date(report.backBy!)}.</>}
+          </p>
+        </Card>
         <Card title={`Податки · ${q.n} квартал`}>
           <dl className="grid grid-cols-2 gap-y-1 text-sm">
             <dt className="text-zinc-500">Виручка кварталу</dt><dd className="text-right tabular-nums">{money(qRevenue)}</dd>
@@ -112,16 +119,21 @@ export default async function FinancePage() {
           </Table>
         </Card>
         <Card title="Прибуток по товарах">
-          <Table head={["Товар", "Виручка", "Витрати", "Результат"]} empty={!byProduct.size}>
-            {[...byProduct.entries()].map(([id, r]) => (
-              <tr key={id}>
+          <Table head={["Товар", "Продано", "Виручка", "Товар", "Реклама", "Відмови", "Податки й комісії", "Прибуток"]} empty={!report.rows.length}>
+            {report.rows.map((r) => (
+              <tr key={r.id}>
                 <Td>{r.name}</Td>
+                <Td>{r.units} шт</Td>
                 <Td>{money(r.revenue)}</Td>
-                <Td>{money(r.costs)}</Td>
-                <Td><Badge tone={r.revenue - r.costs < 0 ? "red" : "green"}>{money(r.revenue - r.costs)}</Badge></Td>
+                <Td>{money(r.goods)}</Td>
+                <Td>{money(r.ads)}</Td>
+                <Td>{money(r.refusals)}</Td>
+                <Td>{money(r.cuts)}</Td>
+                <Td><Badge tone={r.profit < 0 ? "red" : "green"}>{money(r.profit)}</Badge>{r.units > 0 && <div className="text-xs text-zinc-500">{money(r.profit / r.units)}/шт</div>}</Td>
               </tr>
             ))}
           </Table>
+          <p className="mt-2 text-xs text-zinc-500">Рахується з отриманих замовлень: собівартість — середня з партій, реклама — з кампаній, відмова коштує зворотну доставку.</p>
         </Card>
       </div>
 

@@ -63,3 +63,9 @@ export const LYING_TEXT = `Добрий день! Ваша посилка вже
 export function daysAgoIso(n: number) {
   return new Date(Date.now() - n * 86_400_000).toISOString();
 }
+
+// Через 3 дні після отримання товар вже спробували, а враження ще свіжі: найкращий момент для відгуку.
+export const REVIEW_DAYS = 3;
+export function reviewText(product: string | null | undefined) {
+  return `Добрий день! Як вам ${product ?? "товар"}? Якщо все сподобалось, будемо дуже вдячні за короткий відгук з фото: він допомагає іншим покупцям і нашому маленькому магазину. Якщо щось не так — напишіть, вирішимо.`;
+}

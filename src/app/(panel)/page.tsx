@@ -25,13 +25,15 @@ export default async function Navigator() {
     supabase.from("calendar_events").select("kind, title, note, starts_on, ends_on"),
     supabase.from("orders").select("arrived_at").eq("status", "shipped").not("arrived_at", "is", null),
     supabase.from("campaign_performance").select("product_name, spend_uah, orders_count, cpa_max_uah").eq("status", "active").eq("orders_count", 0),
-    supabase.from("inbox").select("*").eq("done", false).order("created_at", { ascending: false }).limit(20),
+    supabase.from("inbox").select("*").eq("done", false).order("created_at", { ascending: false }).limit(30),
     supabase.from("bot_settings").select("owner_chat_id").eq("id", 1).single(),
     supabase.from("transactions").select("kind, amount_uah"),
     supabase.from("inventory_batches").select("product_id, qty, total_cost_uah"),
     supabase.from("product_stock").select("product_id, in_stock, incoming"),
     supabase.from("fx_rates").select("rate, rate_date").eq("currency", "USD").order("rate_date", { ascending: false }).limit(40),
   ]);
+  const notes = (inbox ?? []).filter((n) => n.kind !== "question");
+  const answered = (inbox ?? []).filter((n) => n.kind === "question" && n.answer);
   const tasks = (taskRows ?? []) as TaskRow[];
   const all = steps ?? [];
   const progress = (id: string) => {
@@ -218,14 +220,17 @@ export default async function Navigator() {
             </Card>
           )}
 
-          <Card title={`Записи${inbox?.length ? ` · ${inbox.length}` : ""}`} action={!bot?.owner_chat_id ? <Link href="/bot" className="text-xs text-indigo-600 hover:underline dark:text-indigo-400">з Telegram →</Link> : undefined}>
+          <Card title={`Записи${notes.length ? ` · ${notes.length}` : ""}`} action={!bot?.owner_chat_id ? <Link href="/bot" className="text-xs text-indigo-600 hover:underline dark:text-indigo-400">з Telegram →</Link> : undefined}>
             <form action={addInbox} className="flex gap-1.5">
               <input name="body" required placeholder="Думка, витрата, задача…" className="min-w-0 flex-1 rounded-lg border border-black/15 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500 dark:border-white/15 dark:bg-zinc-950" />
               <button className="grid size-8 shrink-0 place-items-center rounded-lg bg-indigo-600 text-white" aria-label="Записати"><Icon name="plus" className="size-4" /></button>
             </form>
-            {inbox && inbox.length > 0 ? (
+            {answered.length > 0 && (
+              <Link href="/analyst" className="mt-2 block rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800 hover:underline dark:bg-emerald-500/10 dark:text-emerald-300">Аналітик відповів на питання: {answered.length} →</Link>
+            )}
+            {notes.length > 0 ? (
               <ul className="mt-2 divide-y divide-black/[.06] dark:divide-white/5">
-                {inbox.map((n) => (
+                {notes.map((n) => (
                   <li key={n.id} className="flex items-start gap-2 py-1.5 text-sm">
                     <form action={inboxDone}>
                       <input type="hidden" name="id" value={n.id} />
@@ -239,7 +244,7 @@ export default async function Navigator() {
                 ))}
               </ul>
             ) : (
-              <p className="mt-2 text-xs text-zinc-500">Записуй сюди або боту в Telegram усе, що спало на думку. Відмічай, коли переніс у задачі чи фінанси.</p>
+              <p className="mt-2 text-xs text-zinc-500">Записуй сюди або боту в Telegram усе, що спало на думку. Відмічай, коли переніс у задачі чи фінанси. Питання аналітику — на сторінці <Link href="/analyst" className="text-indigo-600 hover:underline dark:text-indigo-400">Аналітик</Link>.</p>
             )}
           </Card>
 
