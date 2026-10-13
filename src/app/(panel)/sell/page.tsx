@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { requireMember } from "@/lib/auth";
 import { Card, PageHeader, Pills } from "@/components/ui";
+import { Infographic } from "@/components/infographic";
 import { Markdown } from "@/components/markdown";
 import { Simulator, type SimProduct } from "@/components/simulator";
 import { CopyButton } from "@/components/copy";
@@ -54,10 +55,13 @@ export default async function SellPage({ searchParams }: PageProps<"/sell">) {
     ["/sell", "Шлях"],
     ...FLOW.map(([slug, , title]) => [`/sell?s=${slug}`, title] as [string, string]),
     ["/sell?s=foto", "Фото вдома"],
+    ["/sell?s=infographic", "Перше фото"],
     ["/sell?s=video-start", "Відео від постачальника"],
     ["/sell?s=simulator", "Симулятор"],
     ["/sell?s=chat", "Відповісти покупцю"],
     ["/sell?s=texts", "Готові тексти"],
+    ["/sell?s=opt", "Опт"],
+    ["/sell?s=pomichnyk", "Помічник"],
     ["/sell?s=slovnyk", "Словник"],
   ];
 
@@ -106,8 +110,15 @@ export default async function SellPage({ searchParams }: PageProps<"/sell">) {
           <p className="mt-4 text-xs text-zinc-500">Оновлено {date(guide.updated_at)} · джерела з цифрами — на сторінці <Link href="/sources" className="text-indigo-600 hover:underline dark:text-indigo-400">Джерела</Link></p>
         </Card>
       )}
-      {section && !guide && section !== "simulator" && section !== "texts" && section !== "slovnyk" && section !== "chat" && (
+      {section && !guide && section !== "simulator" && section !== "infographic" && section !== "texts" && section !== "slovnyk" && section !== "chat" && (
         <Card><p className="text-sm text-zinc-500">Цей розділ аналітик ще дописує.</p></Card>
+      )}
+
+      {section === "infographic" && (
+        <Card title="Перше фото з перевагами">
+          <p className="mb-3 text-sm text-zinc-600 dark:text-zinc-400">Перше фото вирішує, чи клікнуть на картку серед 40 інших. Білий фон, товар великим планом і 3 переваги, які читаються з телефона.</p>
+          <Infographic />
+        </Card>
       )}
 
       {section === "simulator" && (
