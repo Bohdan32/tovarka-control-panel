@@ -30,7 +30,7 @@ export default async function InventoryPage() {
   };
   const toOrder = (stock.data ?? []).filter((s) => reorder(s)?.now);
   // Залежалий товар: лежить на складі понад 30 днів і за місяць жодного продажу.
-  const arrivedLong = new Set(all.filter((b) => b.status === "arrived" && b.arrived_on && b.arrived_on <= since.slice(0, 10)).map((b) => b.product_id));
+  const arrivedLong = new Set((batches.data ?? []).filter((b) => b.status === "arrived" && b.arrived_on && b.arrived_on <= since.slice(0, 10)).map((b) => b.product_id));
   const stale = (stock.data ?? []).filter((s) => Number(s.in_stock) > 0 && !perDay.get(s.product_id ?? "") && arrivedLong.has(s.product_id));
 
   const all = batches.data ?? [];
