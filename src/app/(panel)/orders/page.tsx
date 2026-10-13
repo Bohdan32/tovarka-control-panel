@@ -15,13 +15,16 @@ const TONE: Record<string, "gray" | "green" | "red" | "amber" | "blue"> = {
 
 export default async function OrdersPage() {
   const { supabase } = await requireMember();
-  const [{ data: orders }, products, { data: blacklist }] = await Promise.all([
+  const [{ data: orders }, products, { data: blacklist }, { data: costs }] = await Promise.all([
     supabase.from("orders").select("*, products(name)").order("created_at", { ascending: false }).limit(500),
     productOptions(supabase),
     supabase.from("blacklist").select("*").order("created_at", { ascending: false }),
+    supabase.from("cost_settings").select("return_shipping_uah").eq("id", 1).single(),
   ]);
 
   const all = orders ?? [];
+  const returnedRows = all.filter((o) => o.status === "returned" || o.status === "refused");
+  const returnCost = returnedRows.length * Number(costs?.return_shipping_uah ?? 80);
   const finished = all.filter((o) => ["delivered", "refused", "returned"].includes(o.status));
   const delivered = all.filter((o) => o.status === "delivered");
   const refusalRate = finished.length ? (finished.length - delivered.length) / finished.length : null;
@@ -116,7 +119,7 @@ export default async function OrdersPage() {
           ))}
         </Table>
       </Card>
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-3">
         <Card title="Де відмовляються">
           {reports[0][1].length === 0 ? (
             <p className="text-sm text-zinc-500">З’явиться після перших отриманих посилок і відмов. Нормально до 10–15%. Якщо вище 20%, опис або фото обіцяють більше, ніж є.</p>
@@ -137,6 +140,17 @@ export default async function OrdersPage() {
               ))}
             </div>
           )}
+        </Card>
+
+        <Card title={`Повернення і відмови · ${returnedRows.length}`}>
+          <p className="mb-2 text-sm">Коштували ≈ <b>{money(returnCost)}</b> зворотної доставки{returnedRows.length ? ` (${money(Number(costs?.return_shipping_uah ?? 80))} кожне)` : ""}.</p>
+          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-zinc-500">Коли товар повернувся на склад</p>
+          <ol className="list-decimal space-y-0.5 pl-5 text-sm text-zinc-600 dark:text-zinc-400">
+            <li>Огляд: чи цілий товар, упаковка, комплектація. Сфотографуй.</li>
+            <li>Цілий — перепакуй і назад у продаж (склад рахує його сам після статусу «Повернення»).</li>
+            <li>Пошкоджений — уцінка на OLX або списання; напиши покупцю, якщо пошкодив він.</li>
+            <li>Причина повернення — у «Банк питань»: часті причини треба закривати в описі картки.</li>
+          </ol>
         </Card>
 
         <Card title={`Чорний список · ${(blacklist?.length ?? 0) + refusers.length}`}>

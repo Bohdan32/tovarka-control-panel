@@ -16,7 +16,7 @@ const hours = (min: number) => (min < 60 ? `${min} хв` : `${Math.round(min / 6
 
 export default async function Navigator() {
   const { supabase, member } = await requireMember();
-  const [{ data: steps }, { data: taskRows }, { data: products }, { data: reports }, { data: settings }, { data: events }, { data: shipped }, { data: campaigns }, { data: inbox }, { data: bot }, { data: txs }, { data: batches }, { data: stock }] = await Promise.all([
+  const [{ data: steps }, { data: taskRows }, { data: products }, { data: reports }, { data: settings }, { data: events }, { data: shipped }, { data: campaigns }, { data: inbox }, { data: bot }, { data: txs }, { data: batches }, { data: stock }, { data: fx }] = await Promise.all([
     supabase.from("playbook_steps").select("*").order("n"),
     supabase.from("tasks").select("*, products(name), playbook_steps(n, title)").neq("source", "claude"),
     supabase.from("products").select("*").neq("stage", "rejected").order("score", { ascending: false, nullsFirst: false }),
@@ -30,6 +30,7 @@ export default async function Navigator() {
     supabase.from("transactions").select("kind, amount_uah"),
     supabase.from("inventory_batches").select("product_id, qty, total_cost_uah"),
     supabase.from("product_stock").select("product_id, in_stock, incoming"),
+    supabase.from("fx_rates").select("rate, rate_date").eq("currency", "USD").order("rate_date", { ascending: false }).limit(40),
   ]);
   const tasks = (taskRows ?? []) as TaskRow[];
   const all = steps ?? [];
@@ -143,12 +144,17 @@ export default async function Navigator() {
           )}
 
           {(() => {
+            // Курс долара за місяць виріс більш ніж на 3% → ціни в Китаї подорожчали в гривні.
+            const fxNow = Number(fx?.[0]?.rate ?? 0);
+            const fxThen = Number(fx?.[Math.min(29, (fx?.length ?? 1) - 1)]?.rate ?? 0);
+            const fxJump = fxNow && fxThen ? fxNow / fxThen - 1 : 0;
             const lying = (shipped ?? []).filter((o) => (daysSince(o.arrived_at) ?? 0) >= LYING_DAYS).length;
             const stop = (campaigns ?? []).filter((c) => c.cpa_max_uah && Number(c.spend_uah) >= 2 * Number(c.cpa_max_uah));
-            if (!lying && !stop.length) return null;
+            if (!lying && !stop.length && fxJump < 0.03) return null;
             return (
               <div className="space-y-1 rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-800 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-300">
                 {lying > 0 && <p><Link href="/orders" className="font-semibold hover:underline">{lying} посил. лежать у відділенні 3+ дні →</Link> напиши покупцям, поки не поїхали назад.</p>}
+                {fxJump >= 0.03 && <p><Link href="/calculator" className="font-semibold hover:underline">Долар подорожчав на {pct(fxJump)} за місяць →</Link> собівартість і рекомендовані ціни вже перераховані, перевір свої ціни на майданчиках.</p>}
                 {stop.length > 0 && <p><Link href="/marketing" className="font-semibold hover:underline">Зупини рекламу: {stop.map((c) => c.product_name).join(", ")} →</Link> дві допустимі ціни замовлення без продажу.</p>}
               </div>
             );

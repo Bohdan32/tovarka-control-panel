@@ -53,6 +53,8 @@ export default async function SellPage({ searchParams }: PageProps<"/sell">) {
   const tabs: [string, string][] = [
     ["/sell", "Шлях"],
     ...FLOW.map(([slug, , title]) => [`/sell?s=${slug}`, title] as [string, string]),
+    ["/sell?s=foto", "Фото вдома"],
+    ["/sell?s=video-start", "Відео від постачальника"],
     ["/sell?s=simulator", "Симулятор"],
     ["/sell?s=chat", "Відповісти покупцю"],
     ["/sell?s=texts", "Готові тексти"],

@@ -5,6 +5,7 @@ import { Badge, Card, PageHeader, Table, Td } from "@/components/ui";
 import { money, pct } from "@/lib/format";
 import { QuickCalc, type CalcSettings } from "./quick-calc";
 import { BatchBudget } from "./batch-budget";
+import { ProSale } from "./prosale";
 
 export const metadata: Metadata = { title: "Калькулятор" };
 
@@ -34,6 +35,9 @@ export default async function CalculatorPage() {
             landed: Number(e.landed_cost_uah), moq: e.moq, cpa: Number(e.cpa_uah), profit: Number(e.profit_per_sale_uah),
           }))}
         />
+      </Card>
+      <Card title="Ставка Prom ProSale: чи окупиться клік">
+        <ProSale cpaMax={Number(rows?.find((e) => e.is_selected)?.cpa_max_uah ?? rows?.[0]?.cpa_max_uah ?? 0)} />
       </Card>
       <Card title="Усі пропозиції" pad={false} className="p-2 sm:p-3">
         <Table head={["Товар", "Постачальник", "Собівартість", "Ціна", "Ринок", "Прибуток", "Маржа", "CPA max", ""]} empty={!rows?.length}>
