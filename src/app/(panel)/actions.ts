@@ -56,10 +56,24 @@ export async function updateProduct(fd: FormData) {
       seasonality: str(fd, "seasonality"),
       confidence: numOrNull(fd, "confidence"),
       next_review_on: str(fd, "next_review_on"),
+      bundle_with: str(fd, "bundle_with"),
     })
     .eq("id", id);
   check(error);
   revalidatePath(`/products/${id}`);
+}
+
+export async function saveTestReview(fd: FormData) {
+  const { supabase } = await db();
+  const id = str(fd, "id")!;
+  const verdict = str(fd, "test_verdict");
+  const patch: Record<string, unknown> = { test_verdict: verdict, test_lesson: str(fd, "test_lesson") };
+  // Вирішили зупинити тест — товар іде в «Відкинуто», продовжуємо — в «Продажі».
+  if (verdict === "stop") patch.stage = "rejected";
+  if (verdict === "go") patch.stage = "selling";
+  check((await supabase.from("products").update(patch).eq("id", id)).error);
+  revalidatePath(`/products/${id}`);
+  revalidatePath("/products");
 }
 
 export async function deleteProduct(fd: FormData) {
@@ -211,6 +225,13 @@ export async function updateOrder(fd: FormData) {
   revalidatePath("/orders");
 }
 
+export async function markRepeatSent(fd: FormData) {
+  const { supabase } = await db();
+  const { error } = await supabase.from("orders").update({ repeat_sent_at: new Date().toISOString() }).eq("id", str(fd, "id")!);
+  check(error);
+  revalidatePath("/orders");
+}
+
 export async function markReviewAsked(fd: FormData) {
   const { supabase } = await db();
   const { error } = await supabase.from("orders").update({ review_asked_at: new Date().toISOString() }).eq("id", str(fd, "id")!);
@@ -263,7 +284,9 @@ export async function createCampaign(fd: FormData) {
     product_id: str(fd, "product_id")!,
     channel: str(fd, "channel") ?? "Meta",
     name: str(fd, "name"),
+    creative: str(fd, "creative"),
     spend_uah: numOrNull(fd, "spend_uah") ?? 0,
+    clicks: numOrNull(fd, "clicks"),
     orders_count: numOrNull(fd, "orders_count") ?? 0,
   });
   check(error);
@@ -276,6 +299,7 @@ export async function updateCampaign(fd: FormData) {
     .from("ad_campaigns")
     .update({
       spend_uah: numOrNull(fd, "spend_uah") ?? 0,
+      clicks: numOrNull(fd, "clicks"),
       orders_count: numOrNull(fd, "orders_count") ?? 0,
       status: str(fd, "status") ?? "active",
     })

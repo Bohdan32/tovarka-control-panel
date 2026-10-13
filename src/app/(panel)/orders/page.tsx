@@ -1,10 +1,10 @@
 import { requireMember } from "@/lib/auth";
 import { productOptions } from "@/lib/products";
-import { addBlacklist, createOrder, markArrived, markReviewAsked, removeBlacklist, updateOrder } from "../actions";
+import { addBlacklist, createOrder, markArrived, markRepeatSent, markReviewAsked, removeBlacklist, updateOrder } from "../actions";
 import type { Metadata } from "next";
 import { AddForm, Badge, Button, Card, Field, FormGrid, PageHeader, Select, Stat, Stats, Table, Td, miniInput } from "@/components/ui";
 import { ORDER_STATUSES, date, money, pct } from "@/lib/format";
-import { LYING_DAYS, LYING_TEXT, PREPAY_FROM_UAH, REVIEW_DAYS, daysSince, reviewText, prepayReason, refusalBy, riskyPhones } from "@/lib/orders";
+import { LYING_DAYS, LYING_TEXT, PREPAY_FROM_UAH, REVIEW_DAYS, daysSince, normPhone, repeatText, reviewText, prepayReason, refusalBy, riskyPhones } from "@/lib/orders";
 import { CopyButton } from "@/components/copy";
 
 export const metadata: Metadata = { title: "Замовлення" };
@@ -45,6 +45,15 @@ export default async function OrdersPage() {
     const d = daysSince(o.delivered_at);
     return o.status === "delivered" && !o.review_asked_at && d !== null && d >= REVIEW_DAYS && d <= 30;
   });
+  // Повторні продажі: отримали 30–60 днів тому, ще не писали, без відмов. Один рядок на телефон.
+  const seen = new Set<string>();
+  const repeat = all.filter((o) => {
+    const d = daysSince(o.delivered_at ?? o.created_at);
+    const p = normPhone(o.phone);
+    if (o.status !== "delivered" || o.repeat_sent_at || d === null || d < 30 || d > 60 || !p || risky.has(p) || seen.has(p)) return false;
+    seen.add(p);
+    return !all.some((x) => normPhone(x.phone) === p && x.repeat_sent_at);
+  }).slice(0, 10);
   const reports = [
     ["Товар", refusalBy(all, (o) => o.products?.name)],
     ["Канал", refusalBy(all, (o) => o.channel)],
@@ -91,6 +100,23 @@ export default async function OrdersPage() {
                 <span className="flex items-center gap-2">
                   <CopyButton text={reviewText(o.products?.name)} />
                   <form action={markReviewAsked}><input type="hidden" name="id" value={o.id} /><button className="text-xs text-indigo-600 hover:underline dark:text-indigo-400">надіслав</button></form>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
+      {repeat.length > 0 && (
+        <Card title={`Повторні продажі · ${repeat.length}`}>
+          <p className="mb-2 text-xs text-zinc-500">Пиши лише тим, з ким уже листувався в чаті і хто не просив не турбувати. Повторний покупець не коштує реклами.</p>
+          <ul className="space-y-2 text-sm">
+            {repeat.map((o) => (
+              <li key={o.id} className="flex flex-wrap items-center justify-between gap-2">
+                <span>{o.customer_name ?? o.phone} · {o.products?.name}<span className="block text-xs text-zinc-500">купив {daysSince(o.delivered_at ?? o.created_at)} дн. тому · {o.channel ?? "канал не вказано"}</span></span>
+                <span className="flex items-center gap-2">
+                  <CopyButton text={repeatText(o.customer_name, o.products?.name)} />
+                  <form action={markRepeatSent}><input type="hidden" name="id" value={o.id} /><button className="text-xs text-indigo-600 hover:underline dark:text-indigo-400">надіслав</button></form>
                 </span>
               </li>
             ))}

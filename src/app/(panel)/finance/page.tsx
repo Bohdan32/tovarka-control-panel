@@ -4,7 +4,7 @@ import { createTransaction } from "../actions";
 import type { Metadata } from "next";
 import { AddForm, Badge, Button, Card, Field, FormGrid, PageHeader, Progress, Select, Stat, Stats, Table, Td } from "@/components/ui";
 import { TX_KINDS, date, money, pct } from "@/lib/format";
-import { ENVELOPES, ESV_MONTH, FOP3_LIMIT, MIN_WAGE_2026, productProfit, quarterOf, yearStart } from "@/lib/money";
+import { ENVELOPES, ESV_MONTH, FOP3_LIMIT, MIN_WAGE_2026, PORTFOLIO, portfolioRole, productProfit, quarterOf, yearStart } from "@/lib/money";
 
 export const metadata: Metadata = { title: "Фінанси" };
 
@@ -120,9 +120,11 @@ export default async function FinancePage() {
         </Card>
         <Card title="Прибуток по товарах">
           <Table head={["Товар", "Продано", "Виручка", "Товар", "Реклама", "Відмови", "Податки й комісії", "Прибуток"]} empty={!report.rows.length}>
-            {report.rows.map((r) => (
+            {report.rows.map((r) => {
+              const [roleName, roleTone, roleHint] = PORTFOLIO[portfolioRole(r)];
+              return (
               <tr key={r.id}>
-                <Td>{r.name}</Td>
+                <Td>{r.name}<div className="mt-0.5" title={roleHint}><Badge tone={roleTone}>{roleName}</Badge></div></Td>
                 <Td>{r.units} шт</Td>
                 <Td>{money(r.revenue)}</Td>
                 <Td>{money(r.goods)}</Td>
@@ -131,8 +133,14 @@ export default async function FinancePage() {
                 <Td>{money(r.cuts)}</Td>
                 <Td><Badge tone={r.profit < 0 ? "red" : "green"}>{money(r.profit)}</Badge>{r.units > 0 && <div className="text-xs text-zinc-500">{money(r.profit / r.units)}/шт</div>}</Td>
               </tr>
-            ))}
+              );
+            })}
           </Table>
+          {report.rows.length > 0 && (
+            <ul className="mt-2 grid gap-1 text-xs text-zinc-600 sm:grid-cols-2 dark:text-zinc-400">
+              {Object.values(PORTFOLIO).map(([n, tone, hint]) => <li key={n}><Badge tone={tone}>{n}</Badge> {hint}</li>)}
+            </ul>
+          )}
           <p className="mt-2 text-xs text-zinc-500">Рахується з отриманих замовлень: собівартість — середня з партій, реклама — з кампаній, відмова коштує зворотну доставку.</p>
         </Card>
       </div>
