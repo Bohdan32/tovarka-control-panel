@@ -16,7 +16,7 @@ const hours = (min: number) => (min < 60 ? `${min} хв` : `${Math.round(min / 6
 
 export default async function Navigator() {
   const { supabase, member } = await requireMember();
-  const [{ data: steps }, { data: taskRows }, { data: products }, { data: reports }, { data: settings }, { data: events }, { data: shipped }, { data: campaigns }, { data: inbox }, { data: bot }] = await Promise.all([
+  const [{ data: steps }, { data: taskRows }, { data: products }, { data: reports }, { data: settings }, { data: events }, { data: shipped }, { data: campaigns }, { data: inbox }, { data: bot }, { data: txs }, { data: batches }, { data: stock }] = await Promise.all([
     supabase.from("playbook_steps").select("*").order("n"),
     supabase.from("tasks").select("*, products(name), playbook_steps(n, title)").neq("source", "claude"),
     supabase.from("products").select("*").neq("stage", "rejected").order("score", { ascending: false, nullsFirst: false }),
@@ -27,6 +27,9 @@ export default async function Navigator() {
     supabase.from("campaign_performance").select("product_name, spend_uah, orders_count, cpa_max_uah").eq("status", "active").eq("orders_count", 0),
     supabase.from("inbox").select("*").eq("done", false).order("created_at", { ascending: false }).limit(20),
     supabase.from("bot_settings").select("owner_chat_id").eq("id", 1).single(),
+    supabase.from("transactions").select("kind, amount_uah"),
+    supabase.from("inventory_batches").select("product_id, qty, total_cost_uah"),
+    supabase.from("product_stock").select("product_id, in_stock, incoming"),
   ]);
   const tasks = (taskRows ?? []) as TaskRow[];
   const all = steps ?? [];
@@ -67,6 +70,33 @@ export default async function Navigator() {
           Виконано {doneAll} з {tasks.length} задач · до перших продажів ≈ {hours(leftMin)} роботи і {compact(leftCost[0])}–{compact(leftCost[1])} грн · $ {rate.toFixed(2)}
         </p>
       </header>
+
+      {(() => {
+        // «Гроші одним рядком»: скільки вклали, скільки повернулось і скільки зараз лежить у товарі.
+        const sum = (k: string) => (txs ?? []).filter((t) => t.kind === k).reduce((a, t) => a + Number(t.amount_uah), 0);
+        const invested = sum("investment");
+        const returned = sum("revenue");
+        const unit = new Map<string, { qty: number; cost: number }>();
+        for (const b of batches ?? []) {
+          const u = unit.get(b.product_id) ?? { qty: 0, cost: 0 };
+          unit.set(b.product_id, { qty: u.qty + b.qty, cost: u.cost + Number(b.total_cost_uah) });
+        }
+        const inGoods = (stock ?? []).reduce((a, s) => {
+          const u = unit.get(s.product_id ?? "");
+          return u && u.qty ? a + (u.cost / u.qty) * Math.max(Number(s.in_stock) + Number(s.incoming), 0) : a;
+        }, 0);
+        if (!invested && !returned && !inGoods) return null;
+        return (
+          <Link href="/finance" className="grid grid-cols-3 divide-x divide-black/[.07] rounded-xl border border-black/[.07] bg-white text-center dark:divide-white/10 dark:border-white/10 dark:bg-zinc-900">
+            {[["Вкладено", invested], ["Повернулось", returned], ["Зараз у товарі", inGoods]].map(([l, v]) => (
+              <span key={l as string} className="px-2 py-2">
+                <span className="block text-[11px] text-zinc-500">{l}</span>
+                <span className="block text-sm font-semibold tabular-nums">{money(v as number)}</span>
+              </span>
+            ))}
+          </Link>
+        );
+      })()}
 
       {/* Шлях: 8 кроків від ФОП до продажів */}
       <nav className="-mx-3 flex gap-1.5 overflow-x-auto px-3 pb-1 [scrollbar-width:none] sm:mx-0 sm:px-0">

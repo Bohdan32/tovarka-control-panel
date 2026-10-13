@@ -161,6 +161,8 @@ export async function updateSettings(fd: FormData) {
       refusal_rate: pctOrNull(fd, "refusal_rate") ?? undefined,
       return_shipping_uah: numOrNull(fd, "return_shipping_uah") ?? undefined,
       default_cpa_uah: numOrNull(fd, "default_cpa_uah") ?? undefined,
+      risk_limit_uah: numOrNull(fd, "risk_limit_uah") ?? undefined,
+      lead_days: numOrNull(fd, "lead_days") ?? undefined,
       updated_at: new Date().toISOString(),
     })
     .eq("id", 1);

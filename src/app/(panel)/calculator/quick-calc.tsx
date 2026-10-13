@@ -31,16 +31,20 @@ function Input({ label, value, onChange }: { label: string; value: number; onCha
 }
 
 const MARGINS = [0.2, 0.25, 0.3, 0.35, 0.4];
+// Ставка за кг, дні в дорозі і скільки кг рахують за літр об'єму (легкий і об'ємний товар платить за об'єм).
 const CARGO = [
-  ["Море", 1.5],
-  ["Залізниця", 3],
-  ["Авіа", 9],
+  ["Море", 1.5, "60–75 дн.", 0.2],
+  ["Залізниця", 3, "40–55 дн.", 0.2],
+  ["Авто", 5, "25–35 дн.", 0.2],
+  ["Авіа", 9, "12–20 дн.", 0.167],
 ] as const;
 
 export function QuickCalc({ settings }: { settings: CalcSettings }) {
   const [unit, setUnit] = useState(4);
   const [china, setChina] = useState(0.5);
   const [weight, setWeight] = useState(0.4);
+  const [volume, setVolume] = useState(0);
+  const chargeable = (perLitre: number) => Math.max(weight, volume * perLitre);
   const [cpa, setCpa] = useState(Number(settings.default_cpa_uah));
   const [margin, setMargin] = useState(Number(settings.target_margin) * 100);
   const [market, setMarket] = useState(0);
@@ -60,6 +64,7 @@ export function QuickCalc({ settings }: { settings: CalcSettings }) {
           <Input label="Цільова маржа, %" value={margin} onChange={setMargin} />
           <Input label="Медіана ринку, грн" value={market} onChange={setMarket} />
           <Input label="Партія, шт" value={batch} onChange={setBatch} />
+          <Input label="Об’єм упаковки, л (не обов’язково)" value={volume} onChange={setVolume} />
         </div>
         <dl className="grid grid-cols-2 content-start gap-x-3 gap-y-2 rounded-lg bg-zinc-50 p-3 text-sm dark:bg-white/5">
           <dt className="text-zinc-500">Собівартість до складу</dt><dd className="text-right font-semibold tabular-nums">{money(r.landed)}</dd>
@@ -90,15 +95,15 @@ export function QuickCalc({ settings }: { settings: CalcSettings }) {
             <thead>
               <tr className="border-b border-black/10 text-left text-xs text-zinc-500 dark:border-white/10">
                 <th className="px-2 py-1.5 font-medium">Маржа</th>
-                {CARGO.map(([l, v]) => <th key={l} className="px-2 py-1.5 font-medium">{l} ${v}/кг</th>)}
+                {CARGO.map(([l, v, days]) => <th key={l} className="px-2 py-1.5 font-medium">{l} ${v}/кг<span className="block font-normal">{days}</span></th>)}
               </tr>
             </thead>
             <tbody className="divide-y divide-black/[.05] dark:divide-white/5">
               {MARGINS.map((m) => (
                 <tr key={m}>
                   <td className="px-2 py-1.5 font-medium">{pct(m)}</td>
-                  {CARGO.map(([l, v]) => {
-                    const x = priceFor(settings, unit, china, weight, cpa, m, v);
+                  {CARGO.map(([l, v, , perLitre]) => {
+                    const x = priceFor(settings, unit, china, chargeable(perLitre), cpa, m, v);
                     const over = market > 0 && x.price > market;
                     return (
                       <td key={l} className={`px-2 py-1.5 ${over ? "text-red-600" : ""}`}>
@@ -111,7 +116,7 @@ export function QuickCalc({ settings }: { settings: CalcSettings }) {
             </tbody>
           </table>
         </div>
-        <p className="mt-1 text-xs text-zinc-500">Ціна продажу і прибуток з одного продажу. Червоне — дорожче медіани ринку. Ставки доставки — орієнтири з джерел, свою ставку задай у Налаштуваннях.</p>
+        <p className="mt-1 text-xs text-zinc-500">Ціна продажу і прибуток з одного продажу. Червоне — дорожче медіани ринку. Ставки доставки — орієнтири з джерел, свою ставку задай у Налаштуваннях. Якщо вказати об’єм, легкий і великий товар рахується за об’ємом, як у карго.</p>
       </div>
     </div>
   );

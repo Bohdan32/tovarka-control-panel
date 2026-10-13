@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { Badge, Card, PageHeader, Table, Td } from "@/components/ui";
 import { money, pct } from "@/lib/format";
 import { QuickCalc, type CalcSettings } from "./quick-calc";
+import { BatchBudget } from "./batch-budget";
 
 export const metadata: Metadata = { title: "Калькулятор" };
 
@@ -23,6 +24,16 @@ export default async function CalculatorPage() {
       />
       <Card title="Швидкий розрахунок">
         <QuickCalc settings={s} />
+      </Card>
+      <Card title="Бюджет партії: скільки штук брати">
+        <BatchBudget
+          riskLimit={Number(settings?.risk_limit_uah ?? 15000)}
+          defaultCpa={Number(settings?.default_cpa_uah ?? 120)}
+          offers={(rows ?? []).filter((e, i, a) => a.findIndex((x) => x.product_id === e.product_id) === i).map((e) => ({
+            id: e.offer_id, name: `${e.product_name}${e.supplier_name ? ` · ${e.supplier_name}` : ""}`,
+            landed: Number(e.landed_cost_uah), moq: e.moq, cpa: Number(e.cpa_uah), profit: Number(e.profit_per_sale_uah),
+          }))}
+        />
       </Card>
       <Card title="Усі пропозиції" pad={false} className="p-2 sm:p-3">
         <Table head={["Товар", "Постачальник", "Собівартість", "Ціна", "Ринок", "Прибуток", "Маржа", "CPA max", ""]} empty={!rows?.length}>

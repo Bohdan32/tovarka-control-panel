@@ -59,3 +59,7 @@ export function refusalBy<T extends { status: string }>(orders: T[], key: (o: T)
 }
 
 export const LYING_TEXT = `Добрий день! Ваша посилка вже чекає у відділенні Нової Пошти. Безкоштовне зберігання скоро закінчиться, тож заберіть її, будь ласка, найближчими днями. Якщо щось змінилось — напишіть, підкажемо.`;
+
+export function daysAgoIso(n: number) {
+  return new Date(Date.now() - n * 86_400_000).toISOString();
+}
