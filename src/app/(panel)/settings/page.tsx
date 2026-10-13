@@ -30,6 +30,8 @@ export default async function SettingsPage() {
             <Field label="Частка відмов, %" name="refusal_rate" type="number" defaultValue={p(s?.refusal_rate)} />
             <Field label="Зворотна доставка, грн" name="return_shipping_uah" type="number" defaultValue={s?.return_shipping_uah} />
             <Field label="CPA за замовчуванням, грн" name="default_cpa_uah" type="number" defaultValue={s?.default_cpa_uah} />
+            <Field label="Ліміт ризику на один товар, грн" name="risk_limit_uah" type="number" defaultValue={s?.risk_limit_uah} />
+            <Field label="Доставка партії, днів" name="lead_days" type="number" defaultValue={s?.lead_days} />
           </FormGrid>
           <Button>Зберегти</Button>
         </form>
@@ -50,6 +52,10 @@ export default async function SettingsPage() {
           <form action={refreshRates} className="mt-3">
             <Button variant="ghost">Оновити зараз</Button>
           </form>
+        </Card>
+        <Card title="Копія всіх даних">
+          <p className="mb-2 text-sm text-zinc-500">Безкоштовна база не гарантує відновлення після збою. Раз на тиждень завантажуй копію: товари, замовлення, гроші, задачі — усе в одному файлі.</p>
+          <a href="/settings/backup" className="inline-block rounded-lg border border-black/15 px-3 py-1.5 text-sm font-medium hover:border-indigo-400 dark:border-white/15">Завантажити копію</a>
         </Card>
         <Card title="Доступ">
           <p className="mb-2 text-sm text-zinc-500">Увійти можуть лише ці email. Щоб додати партнера, попроси Claude в проєкті.</p>
