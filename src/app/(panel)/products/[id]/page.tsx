@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { requireMember } from "@/lib/auth";
 import { ConfirmButton } from "@/components/confirm";
 import {
-  addCompetitorPrice, addDemandSignal, addOffer, createSource, createTask, deleteOffer, deleteProduct, selectOffer, startTest, toggleBatchCheck, toggleListingCheck, updateProduct,
+  addCompetitorPrice, addDemandSignal, addOffer, createSource, createTask, deleteOffer, deleteProduct, saveTestReview, selectOffer, startTest, toggleBatchCheck, toggleListingCheck, updateProduct,
 } from "../../actions";
 import { BATCH_CHECKS, LISTING_CHECKS } from "@/lib/checks";
 import { Icon } from "@/components/icons";
@@ -12,6 +12,7 @@ import { TaskList, sortTasks, type TaskRow } from "@/components/tasks";
 import { PricingCard } from "@/components/pricing";
 import { ScoreBars } from "@/components/score";
 import { scoreParts } from "@/lib/score";
+import { daysSince } from "@/lib/orders";
 import { SOURCE_KINDS, SOURCE_TOPICS, STAGES, date, landedEstimate, money, num, pct, roughMargin, usd } from "@/lib/format";
 
 function Thesis({ label, text, tone }: { label: string; text: string | null; tone?: "red" | "amber" }) {
@@ -27,7 +28,7 @@ function Thesis({ label, text, tone }: { label: string; text: string | null; ton
 export default async function ProductPage({ params }: PageProps<"/products/[id]">) {
   const { id } = await params;
   const { supabase } = await requireMember();
-  const [{ data: p }, signals, prices, economics, suppliers, sources, tasks, { data: settings }] = await Promise.all([
+  const [{ data: p }, signals, prices, economics, suppliers, sources, tasks, { data: settings }, { data: pOrders }, { data: pAds }] = await Promise.all([
     supabase.from("products").select("*").eq("id", id).maybeSingle(),
     supabase.from("demand_signals").select("*").eq("product_id", id).order("observed_on", { ascending: false }),
     supabase.from("competitor_prices").select("*").eq("product_id", id).order("price_uah"),
@@ -36,6 +37,8 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
     supabase.from("research_sources").select("*").eq("product_id", id).order("checked_on", { ascending: false }),
     supabase.from("tasks").select("*, products(name), playbook_steps(n, title)").eq("product_id", id),
     supabase.from("cost_settings").select("usd_rate, fee_pct, tax_pct, default_cpa_uah, refusal_rate, return_shipping_uah").eq("id", 1).single(),
+    supabase.from("orders").select("status, qty, price_uah").eq("product_id", id).neq("status", "cancelled"),
+    supabase.from("ad_campaigns").select("spend_uah, started_on").eq("product_id", id),
   ]);
   if (!p) notFound();
 
@@ -45,6 +48,36 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
   const maxPrice = priceList.length ? Math.max(...priceList) : null;
   const estLanded = landedEstimate(p, Number(settings?.usd_rate ?? 0));
   const estMargin = roughMargin(p.price_median_uah, estLanded);
+
+  // Розбір тесту: 14 днів від першої реклами (або від «Беру в тест»), план проти факту.
+  const adStart = (pAds ?? []).map((a) => a.started_on).filter(Boolean).sort()[0] ?? p.in_test_at;
+  const testDays = daysSince(adStart);
+  const t = (() => {
+    const list = pOrders ?? [];
+    const delivered = list.filter((o) => o.status === "delivered");
+    const refused = list.filter((o) => o.status === "refused" || o.status === "returned").length;
+    const units = delivered.reduce((a, o) => a + o.qty, 0);
+    const revenue = delivered.reduce((a, o) => a + Number(o.price_uah) * o.qty, 0);
+    const spend = (pAds ?? []).reduce((a, x) => a + Number(x.spend_uah), 0);
+    const cpa = list.length ? spend / list.length : null;
+    const price = units ? revenue / units : null;
+    const refusalRate = delivered.length + refused ? refused / (delivered.length + refused) : null;
+    const cut = Number(settings?.fee_pct ?? 0) + Number(settings?.tax_pct ?? 0);
+    const landed = selected ? Number(selected.landed_cost_uah) : estLanded;
+    const profit = price !== null && landed !== null && cpa !== null
+      ? price * (1 - cut) - landed - cpa - (units ? (refused * Number(settings?.return_shipping_uah ?? 80)) / units : 0)
+      : null;
+    return {
+      orders: list.length, units, spend, cpa, price, refusalRate, profit,
+      plan: {
+        cpa: Number(p.planned_cpa_uah ?? selected?.cpa_uah ?? settings?.default_cpa_uah ?? 0) || null,
+        price: selected ? Number(selected.price_uah) : p.target_price_uah ? Number(p.target_price_uah) : null,
+        refusalRate: Number(settings?.refusal_rate ?? 0.15),
+        profit: selected ? Number(selected.profit_per_sale_uah) : null,
+      },
+    };
+  })();
+  const showReview = (testDays !== null && testDays >= 14) || Boolean(p.test_verdict);
 
   return (
     <div className="space-y-4">
@@ -74,6 +107,63 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
         <Stat label="CPA max" value={money(selected?.cpa_max_uah)} hint={`план ${money(selected?.cpa_uah)}`} />
       </Stats>
 
+      {p.stage === "test" && testDays !== null && testDays < 14 && !p.test_verdict && (
+        <div className="rounded-xl border border-black/[.07] bg-white p-3 text-sm dark:border-white/10 dark:bg-zinc-900">
+          <b>Тест іде {testDays} дн. з 14.</b> Не міняй усе одразу: збирай замовлення й цифри. Розбір «план проти факту» з’явиться тут через {14 - testDays} дн.
+          <div className="mt-2"><Progress value={testDays / 14} /></div>
+        </div>
+      )}
+
+      {showReview && (
+        <Card title={`Розбір тесту${testDays !== null ? ` · ${testDays} дн.` : ""}`}>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead><tr className="text-left text-xs text-zinc-500"><th className="py-1 font-medium"></th><th className="py-1 font-medium">План</th><th className="py-1 font-medium">Факт</th></tr></thead>
+              <tbody className="divide-y divide-black/[.06] dark:divide-white/5">
+                {([
+                  ["Ціна замовлення (CPA)", t.plan.cpa, t.cpa, "lower"],
+                  ["Ціна продажу", t.plan.price, t.price, "higher"],
+                  ["Прибуток з продажу", t.plan.profit, t.profit, "higher"],
+                ] as const).map(([label, plan, fact, better]) => {
+                  const ok = plan === null || fact === null ? null : better === "lower" ? fact <= plan : fact >= plan;
+                  return (
+                    <tr key={label}>
+                      <td className="py-1.5">{label}</td>
+                      <td className="py-1.5 tabular-nums">{money(plan)}</td>
+                      <td className="py-1.5 tabular-nums">{fact === null ? "—" : <Badge tone={ok === null ? "gray" : ok ? "green" : "red"}>{money(fact)}</Badge>}</td>
+                    </tr>
+                  );
+                })}
+                <tr>
+                  <td className="py-1.5">Частка відмов</td>
+                  <td className="py-1.5 tabular-nums">{pct(t.plan.refusalRate)}</td>
+                  <td className="py-1.5 tabular-nums">{t.refusalRate === null ? "—" : <Badge tone={t.refusalRate <= t.plan.refusalRate ? "green" : "red"}>{pct(t.refusalRate)}</Badge>}</td>
+                </tr>
+                <tr><td className="py-1.5">Замовлень / продано</td><td className="py-1.5 text-zinc-500">30 за тест</td><td className="py-1.5 tabular-nums">{t.orders} / {t.units} шт</td></tr>
+                <tr><td className="py-1.5">Витрачено на рекламу</td><td className="py-1.5"></td><td className="py-1.5 tabular-nums">{money(t.spend)}</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-2 text-xs text-zinc-500">
+            {t.orders === 0
+              ? "Замовлень немає — це теж відповідь. Перевір «Коли відмовляємось» у тезі."
+              : t.profit !== null && t.profit > 0 && (t.cpa ?? 0) <= (t.plan.cpa ?? Infinity)
+                ? "Тест вдався: продається з прибутком. Можна дозамовляти і додавати канали."
+                : "Є продажі, але цифри гірші за план. Спершу міняй креатив або ціну, а не бюджет."}
+          </p>
+          <form action={saveTestReview} className="mt-3 space-y-2 border-t border-black/[.07] pt-3 dark:border-white/10">
+            <input type="hidden" name="id" value={p.id} />
+            <div className="flex flex-wrap gap-3 text-sm">
+              {([["go", "Продовжуємо → «Продажі»"], ["fix", "Міняємо креатив/ціну, ще тиждень"], ["stop", "Зупиняємо → «Відкинуто»"]] as const).map(([v, l]) => (
+                <label key={v} className="flex items-center gap-1.5"><input type="radio" name="test_verdict" value={v} defaultChecked={p.test_verdict === v} required /> {l}</label>
+              ))}
+            </div>
+            <TextArea label="Урок для наступного товару" name="test_lesson" defaultValue={p.test_lesson} rows={2} placeholder="Що спрацювало, що ні, що зробиш інакше" />
+            <Button>Зберегти розбір</Button>
+          </form>
+        </Card>
+      )}
+
       <Card title={`З чого складається оцінка ${p.score ?? ""}`}>
         <ScoreBars parts={scoreParts(p, selected?.margin != null ? Number(selected.margin) : estMargin, signals.data?.length ?? 0)} />
       </Card>
@@ -87,6 +177,7 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
             <Thesis label="Сезонність" text={p.seasonality} />
             {p.where_to_sell && <Thesis label="Де продавати" text={p.where_to_sell} />}
             {p.ad_angle && <Thesis label="Ідея реклами без обличчя" text={p.ad_angle} />}
+            {p.bundle_with && <Thesis label="Комплект: з чим продавати разом" text={p.bundle_with} />}
             <div className="text-xs text-zinc-500">Наступний перегляд: {date(p.next_review_on)}</div>
           </div>
         </Card>
@@ -195,6 +286,7 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
             <Field label="Плановий CPA, грн" name="planned_cpa_uah" type="number" defaultValue={p.planned_cpa_uah} />
             <Field label="Джерело ідеї" name="source_url" defaultValue={p.source_url} />
             <div className="col-span-2"><Field label="Сезонність" name="seasonality" defaultValue={p.seasonality} /></div>
+            <div className="col-span-2"><Field label="Комплект: з чим продавати разом" name="bundle_with" defaultValue={p.bundle_with} placeholder="напр. наклейки-підписи до органайзера" /></div>
           </FormGrid>
           <div className="grid gap-2.5 sm:grid-cols-3">
             <TextArea label="Чому продаватиметься" name="thesis" defaultValue={p.thesis} />

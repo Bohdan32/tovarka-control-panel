@@ -82,3 +82,18 @@ export function productProfit({ orders, batches, ads, stock, cut, returnShipping
   const backBy = daysBack === null ? null : new Date(now + daysBack * 86_400_000).toISOString();
   return { rows: out, frozen, daysBack, backBy };
 }
+
+// Портфель: куди вкладати наступну партію. Межі — 10 продажів і 15% маржі після всіх витрат.
+export const PORTFOLIO = {
+  star: ["Зірка", "green", "Продається і заробляє — сюди наступна партія і більше реклами."],
+  promising: ["Перспективний", "blue", "Заробляє, але продажів мало — додай канал або креатив."],
+  thin: ["Без маржі", "amber", "Продається, але майже в нуль — піднімай ціну або знижуй ціну замовлення."],
+  ballast: ["Баласт", "red", "Не заробляє — розпродай залишок і не замовляй знову."],
+} as const;
+
+export function portfolioRole(r: { units: number; revenue: number; profit: number }): keyof typeof PORTFOLIO {
+  const margin = r.revenue > 0 ? r.profit / r.revenue : -1;
+  if (r.profit <= 0) return r.units >= 10 ? "thin" : "ballast";
+  if (margin < 0.15) return "thin";
+  return r.units >= 10 ? "star" : "promising";
+}

@@ -13,13 +13,15 @@ const ASSET_STATUS = { draft: "Чернетка", approved: "Погоджено"
 
 export default async function MarketingPage() {
   const { supabase } = await requireMember();
-  const [campaigns, assets, products, { data: settings }, { data: orders }] = await Promise.all([
+  const [campaigns, assets, products, { data: settings }, { data: orders }, { data: extra }] = await Promise.all([
     supabase.from("campaign_performance").select("*").order("started_on", { ascending: false }),
     supabase.from("marketing_assets").select("*, products(name)").order("created_at", { ascending: false }),
     productOptions(supabase),
     supabase.from("cost_settings").select("default_cpa_uah").eq("id", 1).single(),
     supabase.from("orders").select("channel, status, qty, price_uah").neq("status", "cancelled"),
+    supabase.from("ad_campaigns").select("id, creative, clicks"),
   ]);
+  const ex = new Map((extra ?? []).map((e) => [e.id, e]));
 
   const rows = campaigns.data ?? [];
   const spend = rows.reduce((a, c) => a + Number(c.spend_uah), 0);
@@ -38,6 +40,26 @@ export default async function MarketingPage() {
   }
   for (const c of rows) ch(AD_TO_ORDER[c.channel as string] ?? c.channel ?? "Інше").spend += Number(c.spend_uah);
   const channelRows = [...byChannel.entries()].sort((a, b) => b[1].orders - a[1].orders || b[1].spend - a[1].spend);
+  // Тест креативів: кілька активних кампаній одного товару — після 200 грн на кожну лишаємо найдешевшу.
+  const TEST_SPEND = 200;
+  const activeBy = new Map<string, typeof rows>();
+  for (const c of rows) if (c.status === "active") activeBy.set(c.product_id!, [...(activeBy.get(c.product_id!) ?? []), c]);
+  const tests = [...activeBy.values()]
+    .filter((g) => g.length >= 2)
+    .map((g) => {
+      const cost = (c: (typeof g)[number]) => {
+        const o = Number(c.orders_count), k = Number(ex.get(c.id!)?.clicks ?? 0), sp = Number(c.spend_uah);
+        return o ? { v: sp / o, by: "замовлення" } : k ? { v: sp / k, by: "клік" } : null;
+      };
+      const ready = g.every((c) => Number(c.spend_uah) >= TEST_SPEND);
+      const ranked = g.map((c) => ({ c, cost: cost(c) })).sort((a, b) => {
+        // Спершу ті, що дали замовлення, далі за ціною.
+        if (!a.cost || !b.cost) return a.cost ? -1 : b.cost ? 1 : 0;
+        if (a.cost.by !== b.cost.by) return a.cost.by === "замовлення" ? -1 : 1;
+        return a.cost.v - b.cost.v;
+      });
+      return { product: g[0].product_name, ready, ranked };
+    });
   const losing = rows.filter((c) => c.cpa_uah !== null && c.cpa_max_uah !== null && Number(c.cpa_uah) > Number(c.cpa_max_uah)).length;
 
   return (
@@ -82,15 +104,48 @@ export default async function MarketingPage() {
         </div>
       )}
 
-      <Card title="Рекламні кампанії">
-        <Table head={["Товар", "Канал", "Витрачено", "Замовлень", "CPA", "CPA max", "Статус", "Оновити"]} empty={!campaigns.data?.length}>
+      {tests.map((t) => (
+        <Card key={t.product} title={`Тест креативів · ${t.product}`}>
+          {t.ready && t.ranked[0]?.cost ? (
+            <p className="mb-2 text-sm font-medium text-emerald-700 dark:text-emerald-400">Лиши «{t.ranked[0].c.name ?? ex.get(t.ranked[0].c.id!)?.creative ?? t.ranked[0].c.channel}», решту вимкни, а звільнений бюджет додай переможцю.</p>
+          ) : (
+            <p className="mb-2 text-sm text-zinc-600 dark:text-zinc-400">Чекаємо, поки кожна кампанія витратить по {TEST_SPEND} грн. Нічого не змінюй до того.</p>
+          )}
+          <ol className="space-y-1 text-sm">
+            {t.ranked.map(({ c, cost }, i) => (
+              <li key={c.id} className="flex flex-wrap justify-between gap-2">
+                <span>{i + 1}. {c.name ?? c.channel}{ex.get(c.id!)?.creative && <span className="text-xs italic text-zinc-500"> «{ex.get(c.id!)?.creative}»</span>}</span>
+                <span className="tabular-nums text-zinc-600 dark:text-zinc-400">{money(c.spend_uah)} · {cost ? `${money(cost.v)}/${cost.by}` : "ще без даних"}</span>
+              </li>
+            ))}
+          </ol>
+        </Card>
+      ))}
+
+      <details className="rounded-xl border border-black/[.07] bg-white p-3 text-sm dark:border-white/10 dark:bg-zinc-900">
+        <summary className="cursor-pointer font-semibold">Як тестувати креативи: 3 оголошення по 200 грн</summary>
+        <ol className="mt-2 list-decimal space-y-1 pl-5">
+          <li>Зніми 3 різні відео на один товар: різний перший кадр (проблема, результат «до і після», незвичне використання). Решта однакова.</li>
+          <li>Створи 3 кампанії з однаковим бюджетом і аудиторією. У полі «Креатив» запиши, чим вони відрізняються.</li>
+          <li>3 дні нічого не чіпай. Щодня вноси витрати, кліки й замовлення.</li>
+          <li>Коли кожна витратила {TEST_SPEND} грн — пульт покаже переможця. Лиш його, решту вимкни.</li>
+          <li>Наступного тижня — 2 нові варіанти проти переможця. Так за місяць видно, що працює саме в тебе.</li>
+        </ol>
+      </details>
+
+      <Card title="Рекламні кампанії · журнал креативів">
+        <Table head={["Товар і креатив", "Канал", "Витрачено", "Кліки", "Замовлень", "CPA", "CPA max", "Статус", "Оновити"]} empty={!campaigns.data?.length}>
           {campaigns.data?.map((c) => {
             const over = c.cpa_uah !== null && c.cpa_max_uah !== null && Number(c.cpa_uah) > Number(c.cpa_max_uah);
             return (
               <tr key={c.id}>
-                <Td>{c.product_name}{c.name && <div className="text-xs text-zinc-500">{c.name}</div>}</Td>
+                <Td>
+                  {c.product_name}{c.name && <div className="text-xs text-zinc-500">{c.name}</div>}
+                  {ex.get(c.id!)?.creative && <div className="mt-0.5 max-w-64 text-xs italic text-zinc-500">«{ex.get(c.id!)?.creative}»</div>}
+                </Td>
                 <Td>{c.channel}</Td>
                 <Td>{money(c.spend_uah)}</Td>
+                <Td>{ex.get(c.id!)?.clicks ? <>{ex.get(c.id!)?.clicks}<div className="text-xs text-zinc-500">{money(Number(c.spend_uah) / Number(ex.get(c.id!)?.clicks))}/клік</div></> : "—"}</Td>
                 <Td>{c.orders_count}</Td>
                 <Td><Badge tone={c.cpa_uah === null ? "gray" : over ? "red" : "green"}>{money(c.cpa_uah)}</Badge></Td>
                 <Td>{money(c.cpa_max_uah)}</Td>
@@ -98,8 +153,9 @@ export default async function MarketingPage() {
                 <Td>
                   <form action={updateCampaign} className="flex flex-wrap justify-end gap-1 sm:justify-start">
                     <input type="hidden" name="id" value={c.id!} />
-                    <input name="spend_uah" type="number" step="any" defaultValue={c.spend_uah ?? 0} className={`${miniInput} w-20`} />
-                    <input name="orders_count" type="number" defaultValue={c.orders_count ?? 0} className={`${miniInput} w-14`} />
+                    <input name="spend_uah" type="number" step="any" defaultValue={c.spend_uah ?? 0} className={`${miniInput} w-20`} aria-label="Витрачено" title="Витрачено, грн" />
+                    <input name="clicks" type="number" defaultValue={ex.get(c.id!)?.clicks ?? ""} placeholder="кліки" className={`${miniInput} w-16`} aria-label="Кліки" title="Кліки" />
+                    <input name="orders_count" type="number" defaultValue={c.orders_count ?? 0} className={`${miniInput} w-14`} aria-label="Замовлень" title="Замовлень" />
                     <select name="status" defaultValue={c.status ?? "active"} className={miniInput}>
                       {Object.entries(CAMPAIGN_STATUS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                     </select>
@@ -119,6 +175,7 @@ export default async function MarketingPage() {
             <Field label="Назва" name="name" />
             <Field label="Витрачено, грн" name="spend_uah" type="number" />
           </FormGrid>
+          <TextArea label="Креатив: перші 3 секунди відео або заголовок" name="creative" rows={2} placeholder="напр. «Шафа до і після за 30 секунд», руки, без обличчя" />
           <Button>Створити</Button>
         </form>
       </AddForm>

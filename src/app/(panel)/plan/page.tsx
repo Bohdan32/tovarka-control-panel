@@ -101,12 +101,25 @@ export default async function PlanPage({ searchParams }: PageProps<"/plan">) {
                   <h3 className="mb-1 text-xs font-medium uppercase tracking-wide text-zinc-500">Задачі</h3>
                   <TaskList tasks={shown} empty={all.length ? "У цьому фільтрі нічого" : "Задач немає"} />
                 </div>
-                {s.body && (
-                  <div className="min-w-0 rounded-lg bg-zinc-50 p-3 dark:bg-white/5">
-                    <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">Як і варіанти</h3>
-                    <Markdown text={s.body} />
-                  </div>
-                )}
+                <div className="min-w-0 space-y-3">
+                  {(s.why || s.result || s.mistakes) && (
+                    <details className="rounded-lg border border-indigo-200 bg-indigo-50/60 p-3 dark:border-indigo-500/30 dark:bg-indigo-500/10">
+                      <summary className="cursor-pointer text-sm font-semibold text-indigo-800 dark:text-indigo-200">Поясни як новачку</summary>
+                      <dl className="mt-2 space-y-2 text-sm">
+                        {s.why && <div><dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">Навіщо</dt><dd>{s.why}</dd></div>}
+                        {s.result && <div><dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">Як виглядає результат</dt><dd>{s.result}</dd></div>}
+                        <div><dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">Скільки часу і грошей</dt><dd>{s.days_min}–{s.days_max} дн. · {range(s.cost_min_uah, s.cost_max_uah)}</dd></div>
+                        {s.mistakes && <div><dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">Типові помилки</dt><dd><Markdown text={s.mistakes} /></dd></div>}
+                      </dl>
+                    </details>
+                  )}
+                  {s.body && (
+                    <div className="rounded-lg bg-zinc-50 p-3 dark:bg-white/5">
+                      <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">Як і варіанти</h3>
+                      <Markdown text={s.body} />
+                    </div>
+                  )}
+                </div>
               </div>
             </details>
           );

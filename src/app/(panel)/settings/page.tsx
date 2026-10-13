@@ -4,14 +4,20 @@ import type { Metadata } from "next";
 import { Button, Card, Field, FormGrid, PageHeader, Table, Td } from "@/components/ui";
 import { date } from "@/lib/format";
 
+const TABLES: Record<string, string> = {
+  products: "товар", orders: "замовлення", transactions: "гроші", inventory_batches: "партія", tasks: "задача", ad_campaigns: "реклама", cost_settings: "налаштування",
+};
+const OPS: Record<string, string> = { insert: "додав", update: "змінив", delete: "видалив" };
+
 export const metadata: Metadata = { title: "Налаштування" };
 
 export default async function SettingsPage() {
   const { supabase } = await requireMember();
-  const [{ data: s }, { data: rates }, { data: members }] = await Promise.all([
+  const [{ data: s }, { data: rates }, { data: members }, { data: log }] = await Promise.all([
     supabase.from("cost_settings").select("*").eq("id", 1).single(),
     supabase.from("fx_rates").select("*").order("rate_date", { ascending: false }).limit(9),
     supabase.from("members").select("*"),
+    supabase.from("audit_log").select("*").order("at", { ascending: false }).limit(40),
   ]);
   const p = (v: number | string | undefined) => (v === undefined ? undefined : Math.round(Number(v) * 10000) / 100);
 
@@ -70,6 +76,23 @@ export default async function SettingsPage() {
           </Table>
         </Card>
       </div>
+
+      <Card title="Історія змін">
+        {log?.length ? (
+          <ul className="divide-y divide-black/[.06] text-sm dark:divide-white/5">
+            {log.map((l) => (
+              <li key={l.id} className="flex flex-wrap items-baseline gap-x-2 py-1.5">
+                <span className="text-xs tabular-nums text-zinc-500">{new Date(l.at).toLocaleString("uk-UA", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Kyiv" })}</span>
+                <span className="font-medium">{members?.find((m) => m.email === l.who)?.display_name ?? (l.who === "система" ? "Бот / аналітик" : l.who)}</span>
+                <span>{OPS[l.op] ?? l.op} {TABLES[l.tbl] ?? l.tbl}</span>
+                {l.label && <span className="min-w-0 truncate text-zinc-500">«{l.label}»</span>}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-zinc-500">Тут видно, хто і що змінив: товари, замовлення, гроші, партії, задачі, рекламу. Корисно, коли працюєте вдвох.</p>
+        )}
+      </Card>
     </div>
   );
 }
