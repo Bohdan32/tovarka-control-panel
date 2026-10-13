@@ -41,6 +41,7 @@ export const NAV: { group: string; items: Item[]; note?: string }[] = [
   {
     group: "Система",
     items: [
+      ["/bot", "Telegram-бот", "send"],
       ["/ideas", "Ідеї", "bulb"],
       ["/settings", "Налаштування", "gear"],
     ],

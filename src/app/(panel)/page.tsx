@@ -6,15 +6,17 @@ import { TaskList, sortTasks, type TaskRow } from "@/components/tasks";
 import { Icon } from "@/components/icons";
 import { buildCalendar } from "@/lib/calendar";
 import { LYING_DAYS, daysSince } from "@/lib/orders";
+import { addInbox, inboxDone } from "./actions";
 import { compact, date, daysUntil, fitIssues, landedEstimate, money, pct, roughMargin } from "@/lib/format";
 
 const RAIL_DAYS = 55;
+const INBOX_KIND: Record<string, string> = { note: "нотатка", expense: "витрата", task: "задача", idea: "ідея", voice: "голосове" };
 const open = (t: TaskRow) => t.status === "todo" || t.status === "doing";
 const hours = (min: number) => (min < 60 ? `${min} хв` : `${Math.round(min / 6) / 10} год`);
 
 export default async function Navigator() {
   const { supabase, member } = await requireMember();
-  const [{ data: steps }, { data: taskRows }, { data: products }, { data: reports }, { data: settings }, { data: events }, { data: shipped }, { data: campaigns }] = await Promise.all([
+  const [{ data: steps }, { data: taskRows }, { data: products }, { data: reports }, { data: settings }, { data: events }, { data: shipped }, { data: campaigns }, { data: inbox }, { data: bot }] = await Promise.all([
     supabase.from("playbook_steps").select("*").order("n"),
     supabase.from("tasks").select("*, products(name), playbook_steps(n, title)").neq("source", "claude"),
     supabase.from("products").select("*").neq("stage", "rejected").order("score", { ascending: false, nullsFirst: false }),
@@ -23,6 +25,8 @@ export default async function Navigator() {
     supabase.from("calendar_events").select("kind, title, note, starts_on, ends_on"),
     supabase.from("orders").select("arrived_at").eq("status", "shipped").not("arrived_at", "is", null),
     supabase.from("campaign_performance").select("product_name, spend_uah, orders_count, cpa_max_uah").eq("status", "active").eq("orders_count", 0),
+    supabase.from("inbox").select("*").eq("done", false).order("created_at", { ascending: false }).limit(20),
+    supabase.from("bot_settings").select("owner_chat_id").eq("id", 1).single(),
   ]);
   const tasks = (taskRows ?? []) as TaskRow[];
   const all = steps ?? [];
@@ -177,6 +181,31 @@ export default async function Navigator() {
               </ul>
             </Card>
           )}
+
+          <Card title={`Записи${inbox?.length ? ` · ${inbox.length}` : ""}`} action={!bot?.owner_chat_id ? <Link href="/bot" className="text-xs text-indigo-600 hover:underline dark:text-indigo-400">з Telegram →</Link> : undefined}>
+            <form action={addInbox} className="flex gap-1.5">
+              <input name="body" required placeholder="Думка, витрата, задача…" className="min-w-0 flex-1 rounded-lg border border-black/15 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500 dark:border-white/15 dark:bg-zinc-950" />
+              <button className="grid size-8 shrink-0 place-items-center rounded-lg bg-indigo-600 text-white" aria-label="Записати"><Icon name="plus" className="size-4" /></button>
+            </form>
+            {inbox && inbox.length > 0 ? (
+              <ul className="mt-2 divide-y divide-black/[.06] dark:divide-white/5">
+                {inbox.map((n) => (
+                  <li key={n.id} className="flex items-start gap-2 py-1.5 text-sm">
+                    <form action={inboxDone}>
+                      <input type="hidden" name="id" value={n.id} />
+                      <button className="mt-0.5 grid size-4 place-items-center rounded border border-black/25 hover:border-emerald-500 dark:border-white/25" aria-label="Опрацьовано" />
+                    </form>
+                    <span className="min-w-0 flex-1">
+                      {n.body}
+                      <span className="block text-xs text-zinc-500">{INBOX_KIND[n.kind] ?? "нотатка"} · {n.source === "telegram" ? "з Telegram" : "з сайту"} · {date(n.created_at)}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-2 text-xs text-zinc-500">Записуй сюди або боту в Telegram усе, що спало на думку. Відмічай, коли переніс у задачі чи фінанси.</p>
+            )}
+          </Card>
 
           <Card title="Корисне">
             <div className="grid gap-2 text-sm">

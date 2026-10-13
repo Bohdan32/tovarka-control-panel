@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { requireMember } from "@/lib/auth";
 import { numOrNull, pctOrNull, str } from "@/lib/form";
 import { BATCH_CHECKS } from "@/lib/checks";
+import { randomBytes } from "node:crypto";
 
 async function db() {
   const { supabase, member } = await requireMember();
@@ -554,4 +555,77 @@ export async function updateQuestion(fd: FormData) {
     }).eq("id", id)).error);
   }
   revalidatePath("/sell");
+}
+
+// ---------- Telegram-бот ----------
+// Бот живе в Supabase Edge Function: сайт за авторизацією Vercel, і Telegram до нього не достукається.
+const BOT_WEBHOOK = "https://nnhbhxvuaudueplijwhs.supabase.co/functions/v1/telegram";
+
+async function telegram(token: string, method: string, body: Record<string, unknown> = {}) {
+  const res = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  return (await res.json().catch(() => ({ ok: false, description: `HTTP ${res.status}` }))) as { ok: boolean; result?: { username?: string }; description?: string };
+}
+
+const randomCode = (n: number) => randomBytes(n).toString("hex");
+
+export async function connectBot(fd: FormData) {
+  const { supabase } = await db();
+  const token = (str(fd, "token") ?? "").replace(/\s/g, "");
+  if (!/^\d{6,}:[\w-]{30,}$/.test(token)) redirect("/bot?err=format");
+  const me = await telegram(token, "getMe");
+  if (!me.ok) redirect("/bot?err=token");
+  const secret = randomCode(24);
+  const hook = await telegram(token, "setWebhook", {
+    url: BOT_WEBHOOK,
+    secret_token: secret,
+    allowed_updates: ["message", "callback_query"],
+    drop_pending_updates: true,
+  });
+  if (!hook.ok) redirect("/bot?err=webhook");
+  await telegram(token, "setMyCommands", { commands: [{ command: "start", description: "Каталог і замовлення" }] });
+  check((await supabase.from("bot_settings").update({
+    token, bot_username: me.result?.username ?? null, webhook_secret: secret, link_code: randomCode(8), owner_chat_id: null,
+  }).eq("id", 1)).error);
+  revalidatePath("/bot");
+  redirect("/bot");
+}
+
+export async function disconnectBot() {
+  const { supabase } = await db();
+  const { data } = await supabase.from("bot_settings").select("token").eq("id", 1).single();
+  if (data?.token) await telegram(data.token, "deleteWebhook");
+  check((await supabase.from("bot_settings").update({ token: null, bot_username: null, webhook_secret: null, link_code: null, owner_chat_id: null }).eq("id", 1)).error);
+  revalidatePath("/bot");
+}
+
+export async function relinkBotOwner() {
+  const { supabase } = await db();
+  check((await supabase.from("bot_settings").update({ owner_chat_id: null, link_code: randomCode(8) }).eq("id", 1)).error);
+  revalidatePath("/bot");
+}
+
+export async function toggleBotDaily(fd: FormData) {
+  const { supabase } = await db();
+  check((await supabase.from("bot_settings").update({ daily_enabled: str(fd, "on") === "1" }).eq("id", 1)).error);
+  revalidatePath("/bot");
+}
+
+// ---------- Швидкі записи ----------
+export async function addInbox(fd: FormData) {
+  const { supabase } = await db();
+  const body = str(fd, "body");
+  if (!body) return;
+  check((await supabase.from("inbox").insert({ body, source: "site" })).error);
+  revalidatePath("/");
+}
+
+export async function inboxDone(fd: FormData) {
+  const { supabase } = await db();
+  check((await supabase.from("inbox").update({ done: true }).eq("id", str(fd, "id")!)).error);
+  revalidatePath("/");
 }
