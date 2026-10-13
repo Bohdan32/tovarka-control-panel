@@ -705,3 +705,25 @@ export async function toggleListingCheck(fd: FormData) {
   check((await supabase.from("products").update({ listing_check: next }).eq("id", productId)).error);
   revalidatePath(`/products/${productId}`);
 }
+
+export async function addOrganicPost(fd: FormData) {
+  const { supabase } = await db();
+  check((await supabase.from("organic_posts").insert({
+    posted_on: str(fd, "posted_on") ?? new Date().toISOString().slice(0, 10),
+    platform: str(fd, "platform") ?? "TikTok",
+    product_id: str(fd, "product_id"),
+    hook: str(fd, "hook"),
+    url: str(fd, "url"),
+  })).error);
+  revalidatePath("/marketing");
+}
+
+export async function updateOrganicPost(fd: FormData) {
+  const { supabase } = await db();
+  check((await supabase.from("organic_posts").update({
+    views: numOrNull(fd, "views"),
+    clicks: numOrNull(fd, "clicks"),
+    orders: numOrNull(fd, "orders"),
+  }).eq("id", str(fd, "id")!)).error);
+  revalidatePath("/marketing");
+}

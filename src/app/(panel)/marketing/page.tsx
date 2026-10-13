@@ -1,8 +1,9 @@
 import { requireMember } from "@/lib/auth";
 import { productOptions } from "@/lib/products";
-import { createAsset, createCampaign, updateCampaign } from "../actions";
+import { addOrganicPost, createAsset, createCampaign, updateCampaign, updateOrganicPost } from "../actions";
+import { daysAgoIso } from "@/lib/orders";
 import type { Metadata } from "next";
-import { AddForm, Badge, Button, Card, Ext, Field, FormGrid, PageHeader, Select, Stat, Stats, Table, Td, TextArea, miniInput } from "@/components/ui";
+import { AddForm, Badge, Button, Card, Ext, Field, FormGrid, PageHeader, Progress, Select, Stat, Stats, Table, Td, TextArea, miniInput } from "@/components/ui";
 import { ASSET_KINDS, money } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Маркетинг" };
@@ -13,14 +14,21 @@ const ASSET_STATUS = { draft: "Чернетка", approved: "Погоджено"
 
 export default async function MarketingPage() {
   const { supabase } = await requireMember();
-  const [campaigns, assets, products, { data: settings }, { data: orders }, { data: extra }] = await Promise.all([
+  const since30 = daysAgoIso(29).slice(0, 10);
+  const [campaigns, assets, products, { data: settings }, { data: orders }, { data: extra }, { data: posts }] = await Promise.all([
     supabase.from("campaign_performance").select("*").order("started_on", { ascending: false }),
     supabase.from("marketing_assets").select("*, products(name)").order("created_at", { ascending: false }),
     productOptions(supabase),
     supabase.from("cost_settings").select("default_cpa_uah").eq("id", 1).single(),
     supabase.from("orders").select("channel, status, qty, price_uah").neq("status", "cancelled"),
     supabase.from("ad_campaigns").select("id, creative, clicks"),
+    supabase.from("organic_posts").select("*, products(name)").order("posted_on", { ascending: false }).limit(60),
   ]);
+  // Органіка: скільки днів з 30 останніх був хоча б один ролик і який хук набрав найбільше.
+  const recent = (posts ?? []).filter((x) => x.posted_on >= since30);
+  const postDays = new Set(recent.map((x) => x.posted_on)).size;
+  const views = recent.reduce((a, x) => a + Number(x.views ?? 0), 0);
+  const best = [...recent].sort((a, b) => Number(b.views ?? 0) - Number(a.views ?? 0))[0];
   const ex = new Map((extra ?? []).map((e) => [e.id, e]));
 
   const rows = campaigns.data ?? [];
@@ -103,6 +111,40 @@ export default async function MarketingPage() {
           </p>
         </div>
       )}
+
+      <Card title={`Органіка: 30 відео за 30 днів · ${postDays}/30`} action={<span className="w-24"><Progress value={postDays / 30} tone={postDays >= 25 ? "green" : "indigo"} /></span>}>
+        <p className="mb-2 text-sm text-zinc-600 dark:text-zinc-400">
+          Безкоштовні перегляди: одне коротке відео щодня, руками й без обличчя. Алгоритм любить регулярність, тож краще просте відео щодня, ніж ідеальне раз на тиждень.
+          {recent.length > 0 && <> За 30 днів: <b>{views.toLocaleString("uk-UA")}</b> переглядів{best?.views ? <>, найкраще — «{best.hook ?? "без хука"}» ({Number(best.views).toLocaleString("uk-UA")}). Зніми ще 2 варіації цього хука.</> : "."}</>}
+        </p>
+        <form action={addOrganicPost} className="mb-3 flex flex-wrap gap-1.5">
+          <input type="date" name="posted_on" defaultValue={daysAgoIso(0).slice(0, 10)} className={miniInput} aria-label="Дата" />
+          <select name="platform" className={miniInput} aria-label="Платформа"><option>TikTok</option><option>Reels</option><option>Shorts</option></select>
+          <select name="product_id" className={`${miniInput} max-w-40`} aria-label="Товар"><option value="">товар —</option>{products.map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
+          <input name="hook" placeholder="Хук: перші 3 секунди" className={`${miniInput} min-w-0 flex-1`} required />
+          <input name="url" placeholder="посилання" className={`${miniInput} w-32`} />
+          <button className="rounded-md bg-indigo-600 px-2.5 text-xs font-medium text-white">Додати</button>
+        </form>
+        {(posts ?? []).length > 0 && (
+          <ul className="divide-y divide-black/[.06] text-sm dark:divide-white/5">
+            {(posts ?? []).slice(0, 10).map((x) => (
+              <li key={x.id} className="flex flex-wrap items-center justify-between gap-2 py-1.5">
+                <span className="min-w-0">
+                  {x.url ? <Ext href={x.url}>{x.hook ?? "відео"}</Ext> : x.hook ?? "відео"}
+                  <span className="block text-xs text-zinc-500">{x.posted_on} · {x.platform}{x.products?.name ? ` · ${x.products.name}` : ""}</span>
+                </span>
+                <form action={updateOrganicPost} className="flex gap-1">
+                  <input type="hidden" name="id" value={x.id} />
+                  <input name="views" type="number" defaultValue={x.views ?? ""} placeholder="перегл." className={`${miniInput} w-20`} aria-label="Перегляди" />
+                  <input name="clicks" type="number" defaultValue={x.clicks ?? ""} placeholder="кліки" className={`${miniInput} w-16`} aria-label="Переходи" />
+                  <input name="orders" type="number" defaultValue={x.orders ?? ""} placeholder="зам." className={`${miniInput} w-14`} aria-label="Замовлення" />
+                  <button className="rounded-md bg-indigo-600 px-2 text-xs font-medium text-white">ok</button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
 
       {tests.map((t) => (
         <Card key={t.product} title={`Тест креативів · ${t.product}`}>
