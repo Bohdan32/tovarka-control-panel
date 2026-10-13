@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireMember } from "@/lib/auth";
 import { numOrNull, pctOrNull, str } from "@/lib/form";
+import { BATCH_STAGES } from "@/lib/format";
 import { BATCH_CHECKS, LISTING_CHECKS } from "@/lib/checks";
 import { randomBytes } from "node:crypto";
 
@@ -196,12 +197,26 @@ export async function createOrder(fd: FormData) {
 
 export async function updateOrder(fd: FormData) {
   const { supabase } = await db();
+  const status = str(fd, "status") ?? "new";
+  const { data: prev } = await supabase.from("orders").select("delivered_at").eq("id", str(fd, "id")!).single();
   const { error } = await supabase
     .from("orders")
-    .update({ status: str(fd, "status") ?? "new", ttn: str(fd, "ttn") })
+    .update({
+      status,
+      ttn: str(fd, "ttn"),
+      delivered_at: status === "delivered" ? prev?.delivered_at ?? new Date().toISOString() : null,
+    })
     .eq("id", str(fd, "id")!);
   check(error);
   revalidatePath("/orders");
+}
+
+export async function markReviewAsked(fd: FormData) {
+  const { supabase } = await db();
+  const { error } = await supabase.from("orders").update({ review_asked_at: new Date().toISOString() }).eq("id", str(fd, "id")!);
+  check(error);
+  revalidatePath("/orders");
+  revalidatePath("/");
 }
 
 // ---------- Склад ----------
@@ -211,7 +226,9 @@ export async function createBatch(fd: FormData) {
     product_id: str(fd, "product_id")!,
     qty: numOrNull(fd, "qty") ?? 1,
     total_cost_uah: numOrNull(fd, "total_cost_uah") ?? 0,
-    status: str(fd, "status") ?? "ordered",
+    status: "ordered",
+    stage: "paid",
+    eta_on: str(fd, "eta_on"),
     notes: str(fd, "notes"),
   });
   check(error);
@@ -220,10 +237,20 @@ export async function createBatch(fd: FormData) {
 
 export async function updateBatch(fd: FormData) {
   const { supabase } = await db();
-  const status = str(fd, "status") ?? "ordered";
+  const stage = str(fd, "stage") ?? "paid";
+  const row = BATCH_STAGES.find(([k]) => k === stage);
+  if (!row) throw new Error("Невідомий етап");
+  const status = row[2];
+  const { data: prev } = await supabase.from("inventory_batches").select("arrived_on").eq("id", str(fd, "id")!).single();
   const { error } = await supabase
     .from("inventory_batches")
-    .update({ status, arrived_on: status === "arrived" ? new Date().toISOString().slice(0, 10) : null })
+    .update({
+      stage,
+      status,
+      eta_on: str(fd, "eta_on"),
+      tracking: str(fd, "tracking"),
+      arrived_on: status === "arrived" ? prev?.arrived_on ?? new Date().toISOString().slice(0, 10) : null,
+    })
     .eq("id", str(fd, "id")!);
   check(error);
   revalidatePath("/inventory");
@@ -626,10 +653,20 @@ export async function addInbox(fd: FormData) {
   revalidatePath("/");
 }
 
+export async function askAnalyst(fd: FormData) {
+  const { supabase } = await db();
+  const body = str(fd, "body");
+  if (!body) return;
+  check((await supabase.from("inbox").insert({ body, kind: "question", source: "site" })).error);
+  revalidatePath("/analyst");
+  revalidatePath("/");
+}
+
 export async function inboxDone(fd: FormData) {
   const { supabase } = await db();
   check((await supabase.from("inbox").update({ done: true }).eq("id", str(fd, "id")!)).error);
   revalidatePath("/");
+  revalidatePath("/analyst");
 }
 
 export async function toggleListingCheck(fd: FormData) {

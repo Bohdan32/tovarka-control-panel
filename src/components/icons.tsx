@@ -27,6 +27,7 @@ const PATHS: Record<string, ReactNode> = {
   calendar: <><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></>,
   send: <><path d="M21 3 3 10.5l7 2.5 2.5 7z" /><path d="m10 13 4.5-4.5" /></>,
   alert: <><path d="M12 3 2 20h20z" /><path d="M12 10v4M12 17h.01" /></>,
+  search: <><circle cx="11" cy="11" r="6.5" /><path d="m20 20-4.2-4.2" /></>,
 };
 
 export type IconName = keyof typeof PATHS;

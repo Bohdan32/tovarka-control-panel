@@ -1,10 +1,10 @@
 import { requireMember } from "@/lib/auth";
 import { productOptions } from "@/lib/products";
-import { addBlacklist, createOrder, markArrived, removeBlacklist, updateOrder } from "../actions";
+import { addBlacklist, createOrder, markArrived, markReviewAsked, removeBlacklist, updateOrder } from "../actions";
 import type { Metadata } from "next";
 import { AddForm, Badge, Button, Card, Field, FormGrid, PageHeader, Select, Stat, Stats, Table, Td, miniInput } from "@/components/ui";
 import { ORDER_STATUSES, date, money, pct } from "@/lib/format";
-import { LYING_DAYS, LYING_TEXT, PREPAY_FROM_UAH, daysSince, prepayReason, refusalBy, riskyPhones } from "@/lib/orders";
+import { LYING_DAYS, LYING_TEXT, PREPAY_FROM_UAH, REVIEW_DAYS, daysSince, reviewText, prepayReason, refusalBy, riskyPhones } from "@/lib/orders";
 import { CopyButton } from "@/components/copy";
 
 export const metadata: Metadata = { title: "Замовлення" };
@@ -41,6 +41,10 @@ export default async function OrdersPage() {
   const lying = all
     .filter((o) => o.status === "shipped" && (daysSince(o.arrived_at) ?? -1) >= LYING_DAYS)
     .sort((a, b) => a.arrived_at!.localeCompare(b.arrived_at!));
+  const askReview = all.filter((o) => {
+    const d = daysSince(o.delivered_at);
+    return o.status === "delivered" && !o.review_asked_at && d !== null && d >= REVIEW_DAYS && d <= 30;
+  });
   const reports = [
     ["Товар", refusalBy(all, (o) => o.products?.name)],
     ["Канал", refusalBy(all, (o) => o.channel)],
@@ -59,7 +63,7 @@ export default async function OrdersPage() {
         <Stat label="Середній чек" value={money(avgCheck)} />
         <Stat label="Частка відмов" value={pct(refusalRate)} tone={refusalRate !== null && refusalRate > 0.2 ? "bad" : undefined} hint={topChannel ? `топ канал: ${topChannel[0]}` : undefined} />
       </Stats>
-      {(lying.length > 0 || needPrepay.length > 0) && (
+      {(lying.length > 0 || needPrepay.length > 0 || askReview.length > 0) && (
         <Card title="Потрібна дія">
           <ul className="space-y-2 text-sm">
             {lying.map((o) => (
@@ -76,6 +80,18 @@ export default async function OrdersPage() {
               <li key={o.id}>
                 <Badge tone="amber">передоплата</Badge> {o.customer_name ?? o.phone ?? "Клієнт"} · {money(Number(o.price_uah) * o.qty)}
                 <span className="block text-xs text-zinc-500">{prepay.get(o.id)}</span>
+              </li>
+            ))}
+            {askReview.map((o) => (
+              <li key={o.id} className="flex flex-wrap items-center justify-between gap-2">
+                <span>
+                  <Badge tone="blue">попроси відгук</Badge> {o.customer_name ?? o.phone ?? "Клієнт"} · {o.products?.name}
+                  <span className="block text-xs text-zinc-500">Отримав {daysSince(o.delivered_at)} дн. тому. Скопіюй текст, надішли в чат і натисни «надіслав».</span>
+                </span>
+                <span className="flex items-center gap-2">
+                  <CopyButton text={reviewText(o.products?.name)} />
+                  <form action={markReviewAsked}><input type="hidden" name="id" value={o.id} /><button className="text-xs text-indigo-600 hover:underline dark:text-indigo-400">надіслав</button></form>
+                </span>
               </li>
             ))}
           </ul>

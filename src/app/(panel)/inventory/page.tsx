@@ -3,7 +3,7 @@ import { productOptions } from "@/lib/products";
 import { createBatch, updateBatch } from "../actions";
 import type { Metadata } from "next";
 import { AddForm, Badge, Button, Card, Field, FormGrid, PageHeader, Select, Stat, Stats, Table, Td, miniInput } from "@/components/ui";
-import { BATCH_STATUSES, date, money } from "@/lib/format";
+import { BATCH_STAGES, date, money } from "@/lib/format";
 import { daysAgoIso } from "@/lib/orders";
 
 export const metadata: Metadata = { title: "Склад" };
@@ -11,13 +11,21 @@ export const metadata: Metadata = { title: "Склад" };
 export default async function InventoryPage() {
   const { supabase } = await requireMember();
   const since = daysAgoIso(30);
-  const [stock, batches, products, { data: sold }, { data: settings }] = await Promise.all([
+  const today = daysAgoIso(0).slice(0, 10);
+  const [stock, batches, products, { data: sold }, { data: settings }, { data: plans }] = await Promise.all([
     supabase.from("product_stock").select("*").or("in_stock.neq.0,incoming.neq.0"),
     supabase.from("inventory_batches").select("*, products(name)").order("ordered_on", { ascending: false }),
     productOptions(supabase),
     supabase.from("orders").select("product_id, qty").in("status", ["confirmed", "shipped", "delivered"]).gte("created_at", since),
     supabase.from("cost_settings").select("lead_days").eq("id", 1).single(),
+    supabase.from("offer_economics").select("product_id, landed_cost_uah, is_selected").order("is_selected", { ascending: false }),
   ]);
+  // Планова собівартість з вибраної пропозиції, щоб порівняти з фактом партії.
+  const planned = new Map<string, number>();
+  for (const o of plans ?? []) if (o.product_id && !planned.has(o.product_id)) planned.set(o.product_id, Number(o.landed_cost_uah));
+  // Старі партії мали лише статус: показуємо відповідний етап.
+  const stageOf = (b: { stage: string | null; status: string }) =>
+    b.status === "arrived" ? "fulfillment" : b.status === "in_transit" && (!b.stage || b.stage === "paid") ? "transit" : b.stage ?? "paid";
   // Точка дозамовлення: продажі за день × (доставка партії + 14 днів запасу).
   const lead = Number(settings?.lead_days ?? 55);
   const perDay = new Map<string, number>();
@@ -84,27 +92,60 @@ export default async function InventoryPage() {
           })}
         </Table>
       </Card>
-      <Card title="Партії">
-        <Table head={["Замовлено", "Товар", "Кількість", "Вартість", "За од.", "Статус"]} empty={!batches.data?.length}>
-          {batches.data?.map((b) => (
-            <tr key={b.id}>
-              <Td>{date(b.ordered_on)}</Td>
-              <Td>{b.products?.name}</Td>
-              <Td>{b.qty}</Td>
-              <Td>{money(b.total_cost_uah)}</Td>
-              <Td>{money(Number(b.total_cost_uah) / b.qty)}</Td>
-              <Td>
-                <form action={updateBatch} className="flex gap-1">
+      <Card title="Партії: де зараз товар">
+        {!all.length && <p className="text-sm text-zinc-500">Ще немає партій. Додай першу після оплати постачальнику.</p>}
+        <div className="space-y-3">
+          {all.map((b) => {
+            const stage = stageOf(b);
+            const idx = BATCH_STAGES.findIndex(([k]) => k === stage);
+            const unit = Number(b.total_cost_uah) / Math.max(b.qty, 1);
+            const plan = planned.get(b.product_id);
+            const diff = plan ? (unit - plan) / plan : null;
+            const late = b.eta_on && stage !== "fulfillment" && b.eta_on < today;
+            return (
+              <div key={b.id} className="rounded-lg border border-black/[.07] p-3 dark:border-white/10">
+                <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                  <div className="font-medium">{b.products?.name} · {b.qty} шт</div>
+                  <div className="text-xs text-zinc-500">
+                    замовлено {date(b.ordered_on)}
+                    {b.eta_on && stage !== "fulfillment" && <> · <span className={late ? "font-medium text-red-600" : ""}>{late ? "запізнюється, мала бути" : "очікуємо"} {date(b.eta_on)}</span></>}
+                    {b.arrived_on && <> · прийшла {date(b.arrived_on)}</>}
+                  </div>
+                </div>
+                <ol className="my-2 flex gap-1">
+                  {BATCH_STAGES.map(([k, label], i) => (
+                    <li key={k} className="min-w-0 flex-1">
+                      <div className={`h-1.5 rounded-full ${i <= idx ? "bg-indigo-500" : "bg-zinc-200 dark:bg-white/10"}`} />
+                      <div className={`mt-1 hidden truncate text-[11px] leading-tight sm:block ${i === idx ? "font-semibold text-indigo-700 dark:text-indigo-300" : "text-zinc-500"}`}>{label}</div>
+                    </li>
+                  ))}
+                </ol>
+                <p className="-mt-1 mb-2 text-xs text-zinc-500 sm:hidden">Етап {idx + 1} з {BATCH_STAGES.length}: <b className="text-indigo-700 dark:text-indigo-300">{BATCH_STAGES[idx]?.[1]}</b></p>
+                <div className="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                  <span>Вартість <b className="tabular-nums">{money(b.total_cost_uah)}</b></span>
+                  <span>Факт за шт <b className="tabular-nums">{money(unit)}</b></span>
+                  {plan ? (
+                    <span>План {money(plan)}{" "}
+                      {diff !== null && Math.abs(diff) >= 0.02 && <Badge tone={diff > 0 ? (diff > 0.1 ? "red" : "amber") : "green"}>{diff > 0 ? "+" : ""}{Math.round(diff * 100)}%</Badge>}
+                    </span>
+                  ) : <span className="text-xs text-zinc-500">план: вибери пропозицію в картці товару</span>}
+                </div>
+                {plan && diff !== null && diff > 0.1 && (
+                  <p className="mb-2 text-xs text-red-600">Дорожче плану більш ніж на 10%. Перерахуй ціну продажу в картці товару, щоб не працювати в нуль.</p>
+                )}
+                <form action={updateBatch} className="flex flex-wrap gap-1.5">
                   <input type="hidden" name="id" value={b.id} />
-                  <select name="status" defaultValue={b.status} className={miniInput}>
-                    {Object.entries(BATCH_STATUSES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                  <select name="stage" defaultValue={stage} className={miniInput} aria-label="Етап">
+                    {BATCH_STAGES.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
                   </select>
-                  <button className="rounded-md bg-indigo-600 px-2 text-xs font-medium text-white">ok</button>
+                  <input type="date" name="eta_on" defaultValue={b.eta_on ?? ""} className={miniInput} aria-label="Очікувана дата" />
+                  <input name="tracking" defaultValue={b.tracking ?? ""} placeholder="трек карго" className={`${miniInput} min-w-0 flex-1`} />
+                  <button className="rounded-md bg-indigo-600 px-2.5 text-xs font-medium text-white">Зберегти</button>
                 </form>
-              </Td>
-            </tr>
-          ))}
-        </Table>
+              </div>
+            );
+          })}
+        </div>
       </Card>
       <AddForm title="Нова партія">
         <form action={createBatch} className="space-y-2.5">
@@ -112,7 +153,7 @@ export default async function InventoryPage() {
             <Select label="Товар" name="product_id" options={products} />
             <Field label="Кількість, шт" name="qty" type="number" required />
             <Field label="Повна вартість з доставкою, грн" name="total_cost_uah" type="number" />
-            <Select label="Статус" name="status" options={BATCH_STATUSES} />
+            <Field label="Очікуємо на складі" name="eta_on" type="date" />
           </FormGrid>
           <Button>Додати партію</Button>
         </form>

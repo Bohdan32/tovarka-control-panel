@@ -53,6 +53,15 @@ export const BATCH_STATUSES: Record<string, string> = {
   arrived: "На складі",
 };
 
+// Детальний шлях партії; status для складу виводиться з етапу.
+export const BATCH_STAGES: [key: string, label: string, status: "ordered" | "in_transit" | "arrived"][] = [
+  ["paid", "Оплачено", "ordered"],
+  ["china_wh", "Склад карго в Китаї", "in_transit"],
+  ["transit", "В дорозі", "in_transit"],
+  ["customs", "Митниця", "in_transit"],
+  ["fulfillment", "На фулфілменті НП", "arrived"],
+];
+
 export const TX_KINDS: Record<string, string> = {
   investment: "Вкладення",
   purchase: "Закупівля",
